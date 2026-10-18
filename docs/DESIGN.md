@@ -20,6 +20,8 @@ Manopola turns a Microsoft Surface Dial into a hardware volume knob for the Mac:
 - pressing the Dial toggles mute,
 - the Dial's built-in haptic motor gives a detent click per step.
 
+Planned from M6 (§13): the menu lists output and input devices with their battery levels and switches between them, and one input device can be kept active when macOS would switch to a newly connected headset.
+
 The app is a native AppKit menu bar utility with no third-party dependencies. This document is the hand-off specification for implementation: it records what is known about the hardware, the decisions taken, the architecture, and the open points that must be verified on real hardware first.
 
 ## 2. Background: The Surface Dial on macOS
@@ -58,6 +60,7 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 4. Survive Dial idle sleep, Bluetooth reconnects, and Mac sleep/wake without user action.
 5. Zero idle CPU: fully event-driven, no polling.
 6. No Accessibility permission, no third-party dependencies, no network access.
+7. Planned: show and switch output and input devices from the menu, with battery levels, and keep a chosen input active (FR-19 to FR-21).
 
 ### Non-Goals (v1)
 
@@ -88,6 +91,9 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-14 | Devices without volume control can get software volume, opt-in per device: the Dial then controls a software gain applied to the audio sent to the device (§7.9). |
 | FR-15 | Turning the Dial on a device it cannot control plays the end-stop buzz once per gesture, so the user knows nothing will change. |
 | FR-18 | The menu shows the Dial's battery level, read from the Bluetooth Battery Service (§7.10). |
+| FR-19 | Planned (M6, M7). The menu lists the connected output and input devices; the default output and the default input are shown in bold, Bluetooth devices show their battery level, and clicking a device makes it the default (§7.11, §7.12). |
+| FR-20 | Planned (M6). The menu shows the current default input device between the output and volume lines (§5.3). |
+| FR-21 | Planned (M8). The user can choose one input device that is kept active: while it is connected, Manopola reverts every change of the default input to it (§7.13). |
 
 ### Non-Functional
 
@@ -150,6 +156,33 @@ About Manopola
 ─────────────
 Quit Manopola                ⌘Q
 ```
+
+**Planned menu (M6 to M8, FR-19 to FR-21):**
+
+```
+Surface Dial: Connected, battery 85 %
+Output: AirPods Pro
+Input: MOTU M2 (kept)              (new info line, between output and volume)
+Volume: 42 %
+─────────────
+Output                             (section header)
+  AirPods Pro            L 80 %, R 75 %, case 40 %     (bold: default output)
+  MacBook Pro Speakers
+  MOTU M2
+Input                              (section header)
+  AirPods Pro            L 80 %, R 75 %, case 40 %
+  MacBook Pro Microphone
+  MOTU M2                                              (bold: default input)
+─────────────
+Mute                         ✓
+─────────────
+Settings…                    ⌘,
+About Manopola
+─────────────
+Quit Manopola                ⌘Q
+```
+
+The Input line reads "Input: None" without an input device and appends "(kept)" when the default input is the kept device (§7.13). Device items are commands, so they use the regular menu font and label color; details in §7.11.
 
 The three status lines use the menu font at the small system size and the secondary label color, so they read as information rather than commands; their text is always set through `attributedTitle`. The battery part appears only while the level is known (§7.10). The menu is built once. `NSMenuDelegate.menuNeedsUpdate(_:)` refreshes titles and states right before display. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
 
@@ -486,6 +519,8 @@ Connected devices come first, then remembered devices from `Settings.knownDevice
 | `knownOutputDevices` | [String: String] | [:] | UID to name of every output seen; written only when something is new |
 | `softwareVolumeDevices` | [String] | [] | device UIDs with software volume turned on (§7.9) |
 | `softwareVolumeLevels` | [String: Double] | [:] | last software level per device, 1.0 when absent; written per Dial step without `onChange` |
+| `keptInputDevice` | String | "" | planned (M8, §7.13): UID of the input device kept active; empty means off |
+| `knownInputDevices` | [String: String] | [:] | planned (M8): UID to name of every input seen, so a disconnected kept device can still be named |
 
 Out-of-range stored values fall back to the default. Launch at login is not stored; `SMAppService.mainApp.status` is the source of truth (`register()` / `unregister()` in `LoginItem`, a caseless enum).
 
@@ -535,6 +570,53 @@ The HID descriptor has no battery usage, but the Dial exposes the standard Bluet
 4. On disconnect it cancels only its own use of the link and reports the level as unknown.
 
 `AppDelegate` passes the level to `StatusItemController.setDialBatteryLevel(_:)`. Verified 2026-10-18: the level (100 %) arrived about 2 s after the HID connection. If Bluetooth access is denied, the level stays unknown and the Dial line shows no battery.
+
+### 7.11 Device Menu (planned, M6)
+
+The menu lists every connected output and input device and switches the default device on click (FR-19, FR-20; layout in §5.3).
+
+**Device list.** `AudioDeviceInfo` gains `hasOutput` and `hasInput`. `AudioDeviceList` lists every visible device with output or input streams (`CoreAudioProperty.hasStreams(_:scope:)` replaces `hasOutputStreams`), publishes the default output and the default input UID, and also observes `kAudioHardwarePropertyDefaultInputDevice`. The Devices tab keeps showing only devices with `hasOutput`. A device with both directions, such as AirPods or the MOTU M2, appears in both menu sections; the built-in speakers and the built-in microphone are separate Core Audio devices. The software volume aggregate stays filtered (§7.9).
+
+**Lifetime.** `StatusItemController` owns its own `AudioDeviceList`, started when the menu opens and stopped in `menuDidClose(_:)`. The list therefore stays current while the menu is open, for example when AirPods connect, and registers no listener while the menu is closed (NFR-2). On every list change the device items between the two separators are removed and rebuilt.
+
+**Items.** Each section starts with `NSMenuItem.sectionHeader(title:)`, "Output" and "Input", sorted by name like the Devices tab. A device item uses the regular menu font through `attributedTitle`; the default device of its section uses the bold menu font. The battery text (§7.12) follows the name in the secondary label color, right-aligned with a tab stop. A device appears in the menu only while it is connected; remembered devices stay in the Devices tab.
+
+**Switching.** Clicking calls `onSelectOutput(uid)` or `onSelectInput(uid)`. `AppDelegate` translates the UID with `kAudioHardwarePropertyTranslateUIDToDevice` and writes `kAudioHardwarePropertyDefaultOutputDevice` or `kAudioHardwarePropertyDefaultInputDevice` through `CoreAudioProperty.writeDefaultDevice(_:scope:)`. `AudioOutput` follows the new output through its existing listener. While an input is kept (§7.13), selecting an input moves the keep to that device.
+
+**Input line.** "Input: <name>" comes from the default input of the menu's `AudioDeviceList`, "(kept)" appended when it is the kept device.
+
+### 7.12 Accessory Battery Levels (planned, M7)
+
+AirPods and most Classic Bluetooth headphones do not offer the Battery Service that `DialBattery` reads (§7.10). Options evaluated on 2026-10-18 with the developer: CoreBluetooth only (no AirPods), `system_profiler` (public, but a separate process taking 1 to 2 s per menu open) and `IOPSCopyPowerSourcesByType(4)` (chosen).
+
+**Source.** `IOPSCopyPowerSourcesByType` is exported by IOKit but has no header, so it is looked up with `dlsym`; type 4 returns accessory power sources, decoded with the public `IOPSCopyPowerSourcesList` and `IOPSGetPowerSourceDescription`. Voltaic validated it on hardware: one in-process call covers AirPods with separate left, right and case cells as well as other Bluetooth accessories, with no permission prompt. Keys used: `Accessory Identifier` (Bluetooth address), `Group Identifier` (joins the parts of one AirPods), `Part Identifier` (`Left`, `Right`, `Case`), `Current Capacity`, `Name`. This is the only undeclared API in Manopola, accepted because its failure only hides the battery text; if `dlsym` finds no symbol, the reader returns no levels and the menu shows none (R9).
+
+**Reading.** `AccessoryBattery` (struct with a static reader, `Audio/AccessoryBattery.swift`) is read when the menu opens and again when the device list changes while it is open. No power source notification is registered, so it adds no idle work.
+
+**Matching.** A battery belongs to the Core Audio device whose UID carries the same Bluetooth address, compared as uppercase hex digits without separators. Whether every Bluetooth audio UID carries the address is to be verified (R10).
+
+**Text.** AirPods: "L 80 %, R 75 %, case 40 %"; parts that report nothing are left out (the case reports only while it is open). Single-cell devices: "80 %". No battery, no text.
+
+**Dial.** If the capture in M7 shows the Surface Dial among the accessory sources, `DialBattery` and its Bluetooth permission prompt could be replaced; decided after M7.
+
+### 7.13 Kept Input Device (planned, M8)
+
+When AirPods connect, macOS makes them the default output and the default input. In a call that uses the MOTU M2 microphone, the call then switches to the AirPods microphone, and the AirPods drop to their low-quality call profile as soon as an app records from them. The developer wants the output to follow the AirPods but the input to stay on the M2 (FR-21).
+
+**Behavior (decided with the developer 2026-10-18): always revert.** While the kept device is connected, every change of the default input is undone, whether macOS, Control Center or System Settings made it. The user changes the input through the Manopola menu, which moves the keep (§7.11), or turns the keep off. Timing heuristics that would tell an automatic switch from a manual one were rejected as unreliable. The output is never touched.
+
+**Settings.** `keptInputDevice` holds the UID, empty for off; `knownInputDevices` names devices while they are disconnected (§7.7). The Devices tab gets a popup "Keep input device" below the table: Off, every connected input, and the kept device as "MOTU M2 (not connected)" while it is absent. Footnote: "While this device is connected, Manopola switches the input back to it whenever another device takes over."
+
+**`InputDeviceKeeper`** (`Audio/InputDeviceKeeper.swift`) registers listeners only while a kept device is set: `kAudioHardwarePropertyDefaultInputDevice` and `kAudioHardwarePropertyDevices` on the system object, on the main queue. On start and on every notification it checks whether the kept device is connected and not the default input, and if so writes the default input through `CoreAudioProperty.writeDefaultDevice(_:scope:)` and logs at notice level under `audio` which device it replaced. Turning the keep off removes the listeners.
+
+| Situation | Behavior |
+|---|---|
+| AirPods connect while the M2 is kept | output switches to the AirPods, input reverts to the M2 |
+| Kept device disconnects | macOS picks another input; Manopola does nothing |
+| Kept device reconnects | the device list notification switches the input back to it |
+| User selects another input in System Settings | reverted while the kept device is connected |
+| User selects another input in the Manopola menu | becomes the default and the new kept device |
+| Kept device also uses software volume | unaffected: the private aggregate is not a candidate, the M2 itself is |
 
 ## 8. Concurrency Model
 
@@ -636,6 +718,10 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 11. Toggle every setting; detent count and haptics change immediately on the device.
 12. Launch at login: survives a log out / log in.
 13. Activity Monitor: 0 % CPU while idle. Measured 2026-10-18 on the M4 build: no measurable CPU time (below 0.01 s) over 60 s with the Dial connected but idle.
+14. Planned (M6): the menu lists outputs and inputs, the defaults in bold; clicking switches the default output and input; AirPods connecting while the menu is open appear in both sections. Check that system alert sounds follow the selected output.
+15. Planned (M6): the Input line shows the default input and follows a change in System Settings.
+16. Planned (M7): AirPods show left, right and case levels in both sections; a Bluetooth headset without a reported battery shows none; levels match System Settings.
+17. Planned (M8): keep the M2, join a call that uses the system default microphone, connect AirPods: output moves to the AirPods, input returns to the M2, the call keeps working. Unplug and replug the M2: input returns to it. Keep off: macOS behavior is back.
 
 ## 12. Project Structure and Build
 
@@ -690,6 +776,11 @@ make notarize     # notarize, staple, Gatekeeper check
 | **M3 Control** | `DialController`, `DialControllerTests`, wiring in `AppDelegate` | volume and mute fully controllable with the Dial |
 | **M4 UI** | `StatusItemController`, `VolumeOverlay`, `VolumePresentation`, `Settings`, `SettingsWindowController`, `LoginItem`, `SettingsTests`; `DiagnosticsMenu` removed | checklist items 1–12 pass |
 | **M5 Release** | app icon (`scripts/render-icon.swift`: aluminum knob with an amber volume scale on a dark tile), README, `Makefile` with Developer ID signing and notarization, version 1.0.0 | checklist item 13 passes; notarized build runs on a second Mac |
+| **M6 Device menu** (planned) | `CoreAudioProperty` stream scope, default input and default device write; `AudioDeviceInfo.hasOutput` / `hasInput`; `AudioDeviceList` with inputs; device sections and Input line in `StatusItemController`; switching in `AppDelegate`; `AudioDeviceInfoTests` and `StatusItemTitleTests` extended (§7.11) | checklist items 14 and 15 pass |
+| **M7 Battery levels** (planned) | `AccessoryBattery` with `dlsym` lookup, address matching and battery text; `AccessoryBatteryTests` for decoding description dictionaries, matching and text (§7.12) | checklist item 16 passes; R10 answered; decision on replacing `DialBattery` recorded |
+| **M8 Kept input** (planned) | `keptInputDevice` and `knownInputDevices` in `Settings`; `InputDeviceKeeper`; Devices tab popup; keep moved by the menu; `SettingsTests` extended (§7.13) | checklist item 17 passes; R11 checked |
+
+M8 depends only on the input list and the default device write from M6, so it can be built before M7.
 
 ## 14. Risks and Open Questions
 
@@ -703,6 +794,9 @@ make notarize     # notarize, staple, Gatekeeper check
 | R6 | Hardware is discontinued | buy a second used unit as a spare once M3 works |
 | R7 | Software volume adds latency for DAWs and depends on a permission | opt-in per device; checkpoint S2, S3, S7, S8 (§7.9); per-app bypass if recording timing suffers |
 | R8 | Dial wake-up is slow after its 5-minute sleep | Keep-awake spike 2026-10-18: reading feature report 1, re-sending the haptic configuration and a Stop trigger together every 4 minutes kept the link up through a 12-minute idle period (14:24:15 to 14:36:24) that would otherwise have ended in sleep at 14:29:12. Which report is responsible is still to be narrowed down. The debug-only timer fired every 4 min 15 s, because macOS delays timers of background apps, so the final interval needs margin (3 minutes). A ready click on every reconnection after the first tells the user when the Dial is usable. Opt-in keep-awake while the Mac is in use is planned (FR-16). |
+| R9 | `IOPSCopyPowerSourcesByType` has no header and may change or vanish in a macOS update | looked up with `dlsym`; a missing symbol or unknown keys only hide the battery text (§7.12); re-check after every major macOS release |
+| R10 | Does every Bluetooth audio device UID in Core Audio carry the Bluetooth address that IOPS reports as `Accessory Identifier`? | M7 logs both for AirPods and a non-Apple headset; if a UID lacks the address, the matching rule is decided then |
+| R11 | Between the macOS switch and Manopola's revert, a call app recording from the system default may open the AirPods microphone, which switches them to the call profile and can glitch the call; another tool that enforces a different input would make both switch back and forth | M8 checks Zoom, Teams and Meet set to the system default; apps with an explicitly chosen microphone are not affected. A guard against switching back and forth is added only if the log shows it |
 
 ## 15. Future Ideas
 
