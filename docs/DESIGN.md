@@ -30,6 +30,7 @@ The app is a native AppKit menu bar utility with no third-party dependencies. Th
 |---|---|
 | Vendor / Product ID | `0x045E` / `0x091B` |
 | Transport | Bluetooth LE (HID over GATT), requires Bluetooth 4.0. Verified 2026-10-18: IOKit reports transport "Bluetooth Low Energy", primary usage Generic Desktop `0x0E`, max input / output / feature report sizes 73 / 73 / 53 bytes (the vendor collections are larger than report 1) |
+| Sleep and wake | Verified 2026-10-18: the Dial disconnects 4 min 57 s after the last input report (touch released), three times out of three. On wake, macOS needs about 1.6 s from the first advertisement to the HID device match (link 1 ms, encryption 0.29 s, link ready 0.63 s, HID setup 1.0 s); Manopola's share is under 1 ms. The turn that wakes the Dial is lost. macOS reads the battery level over Bluetooth (System Information shows it). |
 | Power | 2 × AAA |
 | Controls | rotation (relative, up to 3600 steps per revolution), one push button |
 | Feedback | haptic motor, controllable via HID haptics usage page `0x0E` |
@@ -676,6 +677,7 @@ make notarize     # notarize, staple, Gatekeeper check
 | R5 | Haptic configuration lost after Dial idle sleep | re-send policy in §7.2 |
 | R6 | Hardware is discontinued | buy a second used unit as a spare once M3 works |
 | R7 | Software volume adds latency for DAWs and depends on a permission | opt-in per device; checkpoint S2, S3, S7, S8 (§7.9); per-app bypass if recording timing suffers |
+| R8 | Dial wake-up is slow after its 5-minute sleep | Keep-awake spike 2026-10-18: reading feature report 1, re-sending the haptic configuration and a Stop trigger together every 4 minutes kept the link up through a 12-minute idle period (14:24:15 to 14:36:24) that would otherwise have ended in sleep at 14:29:12. Which report is responsible is still to be narrowed down. The debug-only timer fired every 4 min 15 s, because macOS delays timers of background apps, so the final interval needs margin (3 minutes). A ready click on every reconnection after the first tells the user when the Dial is usable. Opt-in keep-awake while the Mac is in use is planned (FR-16). |
 
 ## 15. Future Ideas
 

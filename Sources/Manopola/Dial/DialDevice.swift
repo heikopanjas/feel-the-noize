@@ -108,6 +108,37 @@ final class DialDevice: HapticFeedback {
         sendReport(kIOHIDReportTypeOutput, bytes)
     }
 
+    // MARK: - Keep Awake
+
+    /// Reports that might count as activity for the Dial's 5-minute sleep timer (docs/DESIGN.md §7.2).
+    enum KeepAliveReport: String, CaseIterable {
+        case readFeature
+        case resendConfiguration
+        case stopTrigger
+    }
+
+    func sendKeepAlive(_ reports: [KeepAliveReport]) {
+        guard let device else { return }
+        for report in reports {
+            switch report {
+                case .readFeature:
+                    var buffer = [UInt8](repeating: 0, count: 8)
+                    var length = CFIndex(buffer.count)
+                    let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, CFIndex(DialReport.reportID), &buffer, &length)
+                    Log.dial.info(
+                        "Keep-alive read feature report: \(Self.describe(result), privacy: .public), \(Self.hex(Array(buffer.prefix(length))), privacy: .public)"
+                    )
+                case .resendConfiguration:
+                    let result = sendReport(kIOHIDReportTypeFeature, configurationReport(), to: device)
+                    Log.dial.info("Keep-alive configuration: \(Self.describe(result), privacy: .public)")
+                case .stopTrigger:
+                    let bytes = DialReport.manualTrigger(waveform: .stop, repeatCount: 0, retriggerMilliseconds: 0)
+                    let result = sendReport(kIOHIDReportTypeOutput, bytes, to: device)
+                    Log.dial.info("Keep-alive stop trigger: \(Self.describe(result), privacy: .public)")
+            }
+        }
+    }
+
     // MARK: - Session
 
     private func openManager() {

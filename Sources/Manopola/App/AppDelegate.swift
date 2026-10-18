@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isAccessDenied = false
     private var appliedDetents: Int?
     private var appliedHaptics: Bool?
+    /// The first connection after launch stays silent; later ones are wake-ups and confirm readiness with a click.
+    private var hasDialConnectedBefore = false
 
     override init() {
         let settings = Settings()
@@ -56,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if connection != .connected {
                 self?.controller.reset()
             }
+            self?.confirmReconnection(connection)
             self?.refreshStatusItem()
         }
         dial.onAccessDenied = { [weak self] in
@@ -79,7 +82,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.start()
         dial.start()
         refreshStatusItem()
+
+        #if DEBUG
+        startKeepAliveSpike()
+        #endif
     }
+
+    #if DEBUG
+    // Keep-awake spike (docs/DESIGN.md §14): sends the reports named in the `keepAliveSpike` default every 4 minutes.
+    private var keepAliveSpikeTask: Task<Void, Never>?
+
+    private func startKeepAliveSpike() {
+        let names = UserDefaults.standard.stringArray(forKey: "keepAliveSpike") ?? []
+        let reports = names.compactMap(DialDevice.KeepAliveReport.init(rawValue:))
+        guard !reports.isEmpty else { return }
+        Log.dial.info("Keep-alive spike with \(names, privacy: .public) every 4 minutes")
+        keepAliveSpikeTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(240))
+                guard let self, !Task.isCancelled else { return }
+                Log.dial.info("Keep-alive spike tick, Dial \(String(describing: self.dial.connection), privacy: .public)")
+                self.dial.sendKeepAlive(reports)
+            }
+        }
+    }
+    #endif
 
     func applicationWillTerminate(_ notification: Notification) {
         dial.stop()
@@ -108,6 +135,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func toggleMuteFromMenu() {
         guard let state = audio.state else { return }
         audio.setMuted(!state.isMuted)
+    }
+
+    /// The turn that wakes the Dial is lost while macOS reconnects, so a click tells the user when the Dial is ready.
+    private func confirmReconnection(_ connection: DialConnection) {
+        guard connection == .connected else { return }
+        if hasDialConnectedBefore {
+            dial.playHaptic(.click)
+        }
+        hasDialConnectedBefore = true
     }
 
     private func applyDialConfiguration() {
