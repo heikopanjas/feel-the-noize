@@ -6,9 +6,13 @@ import IOKit.hid
 /// The manager is scheduled on the main run loop, so every IOKit callback arrives on the main thread.
 final class DialDevice: HapticFeedback {
     var onEvent: ((DialEvent) -> Void)?
-    var onConnectionChange: ((Bool) -> Void)?
+    var onConnectionChange: ((DialConnection) -> Void)?
     var onAccessDenied: (() -> Void)?
-    private(set) var isConnected = false
+    private(set) var connection = DialConnection.notConnected
+
+    var isConnected: Bool {
+        connection == .connected
+    }
 
     // The Dial powers down when idle and may come back with its default configuration.
     private static let idleReconfigurationThreshold: Duration = .seconds(15)
@@ -16,6 +20,8 @@ final class DialDevice: HapticFeedback {
 
     private var manager: IOHIDManager?
     private var device: IOHIDDevice?
+    /// A matched Dial that another process holds exclusively.
+    private var blockedDevice: IOHIDDevice?
     private var isPressed = false
     private var lastReportTime: ContinuousClock.Instant?
     private var detentsPerRevolution = 36
@@ -38,6 +44,21 @@ final class DialDevice: HapticFeedback {
         }
         wakeObserver = nil
         closeManager()
+    }
+
+    /// Another process may have released the Dial. IOKit sends no notification for that, so the app retries on occasions
+    /// the user causes (menu opened, app activated) instead of polling.
+    func retryIfInUseElsewhere() {
+        guard connection == .inUseElsewhere, manager != nil else { return }
+        Log.dial.info("Retrying a Surface Dial held by another process")
+        closeManager(keepingConnection: true)
+        openManager()
+        // Matching callbacks arrive asynchronously; if the Dial vanished meanwhile, none will, so check right away.
+        if let manager, let devices = IOHIDManagerCopyDevices(manager), CFSetGetCount(devices) > 0 {
+            return
+        }
+        blockedDevice = nil
+        setConnection(.notConnected)
     }
 
     /// Stored while disconnected and applied on the next match.
@@ -100,12 +121,16 @@ final class DialDevice: HapticFeedback {
                 Log.dial.info("HID manager opened in \(mode, privacy: .public) mode")
             case kIOReturnNotPermitted:
                 handleAccessDenied()
+            case kIOReturnExclusiveAccess:
+                // The matching callback still fires for the held device and marks it as in use elsewhere.
+                Log.dial.notice("Another process holds the Surface Dial exclusively")
             default:
                 Log.dial.error("Opening the HID manager failed: \(Self.describe(result), privacy: .public)")
         }
     }
 
-    private func closeManager() {
+    /// `keepingConnection` leaves the published state alone during a retry, so the menu does not flicker to "Not Connected".
+    private func closeManager(keepingConnection: Bool = false) {
         guard let manager else { return }
         IOHIDManagerRegisterDeviceMatchingCallback(manager, nil, nil)
         IOHIDManagerRegisterDeviceRemovalCallback(manager, nil, nil)
@@ -113,7 +138,12 @@ final class DialDevice: HapticFeedback {
         IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
         IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         self.manager = nil
-        deviceDidDisappear()
+        if keepingConnection {
+            resetDeviceState()
+        }
+        else {
+            deviceDidDisappear()
+        }
     }
 
     private func handleAccessDenied() {
@@ -162,20 +192,40 @@ final class DialDevice: HapticFeedback {
             return
         }
 
+        // A match alone does not mean the Dial is usable: when another process has seized it, IOKit still reports the
+        // match but refuses every report. The haptic configuration is the first report, so its result decides.
+        let result = sendReport(kIOHIDReportTypeFeature, configurationReport(), to: matched)
+        switch result {
+            case kIOReturnExclusiveAccess:
+                Log.dial.notice("Surface Dial found, but another process holds it exclusively")
+                blockedDevice = matched
+                setConnection(.inUseElsewhere)
+                return
+            case kIOReturnNotOpen, kIOReturnNotPermitted:
+                Log.dial.error("Surface Dial found, but it could not be opened: \(Self.describe(result), privacy: .public)")
+                return
+            default:
+                // Other failures, such as a Bluetooth timeout, are logged by sendReport; the Dial is still usable.
+                break
+        }
+
+        blockedDevice = nil
         device = matched
-        isConnected = true
         isPressed = false
         lastReportTime = ContinuousClock.now
 
         let transport = IOHIDDeviceGetProperty(matched, kIOHIDTransportKey as CFString) as? String ?? "unknown"
         let maxInputSize = IOHIDDeviceGetProperty(matched, kIOHIDMaxInputReportSizeKey as CFString) as? Int ?? 0
         Log.dial.info("Surface Dial connected, transport \(transport, privacy: .public), max input report \(maxInputSize) bytes")
-
-        sendConfiguration()
-        onConnectionChange?(true)
+        setConnection(.connected)
     }
 
     fileprivate func deviceRemoved(_ removed: IOHIDDevice) {
+        if let blockedDevice, CFEqual(blockedDevice, removed) {
+            Log.dial.info("Surface Dial held by another process disappeared")
+            deviceDidDisappear()
+            return
+        }
         guard let device, CFEqual(device, removed) else { return }
         Log.dial.info("Surface Dial disconnected")
         deviceDidDisappear()
@@ -215,29 +265,51 @@ final class DialDevice: HapticFeedback {
     // MARK: - Reports
 
     private func deviceDidDisappear() {
+        resetDeviceState()
+        setConnection(.notConnected)
+    }
+
+    private func resetDeviceState() {
         device = nil
+        blockedDevice = nil
         isPressed = false
         lastReportTime = nil
-        guard isConnected else { return }
-        isConnected = false
-        onConnectionChange?(false)
+    }
+
+    private func setConnection(_ newConnection: DialConnection) {
+        guard newConnection != connection else { return }
+        connection = newConnection
+        onConnectionChange?(newConnection)
     }
 
     private func sendConfiguration() {
-        let bytes = DialReport.hapticConfiguration(detentsPerRevolution: detentsPerRevolution, hapticsEnabled: hapticsEnabled)
-        sendReport(kIOHIDReportTypeFeature, bytes)
+        guard let device else { return }
+        sendReport(kIOHIDReportTypeFeature, configurationReport(), to: device)
+    }
+
+    private func configurationReport() -> [UInt8] {
+        DialReport.hapticConfiguration(detentsPerRevolution: detentsPerRevolution, hapticsEnabled: hapticsEnabled)
     }
 
     private func sendReport(_ type: IOHIDReportType, _ bytes: [UInt8]) {
         guard let device else { return }
+        sendReport(type, bytes, to: device)
+    }
+
+    @discardableResult
+    private func sendReport(_ type: IOHIDReportType, _ bytes: [UInt8], to device: IOHIDDevice) -> IOReturn {
         // The buffer includes the report ID byte.
         let result = IOHIDDeviceSetReport(device, type, CFIndex(DialReport.reportID), bytes, bytes.count)
-        if result == kIOReturnSuccess {
-            Log.dial.debug("Sent report \(Self.hex(bytes), privacy: .public)")
+        switch result {
+            case kIOReturnSuccess:
+                Log.dial.debug("Sent report \(Self.hex(bytes), privacy: .public)")
+            case kIOReturnExclusiveAccess:
+                // Expected while another process holds the Dial; the caller decides what it means.
+                Log.dial.debug("Report \(Self.hex(bytes), privacy: .public) refused: exclusive access")
+            default:
+                Log.dial.error("Sending report \(Self.hex(bytes), privacy: .public) failed: \(Self.describe(result), privacy: .public)")
         }
-        else {
-            Log.dial.error("Sending report \(Self.hex(bytes), privacy: .public) failed: \(Self.describe(result), privacy: .public)")
-        }
+        return result
     }
 
     private static func hex(_ bytes: [UInt8]) -> String {

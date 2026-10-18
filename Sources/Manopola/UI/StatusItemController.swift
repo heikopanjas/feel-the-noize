@@ -2,12 +2,14 @@ import AppKit
 
 /// Menu bar icon and menu (docs/DESIGN.md §5.2, §5.3, §7.5).
 ///
-/// `update(audio:dialConnected:)` only changes the icon; menu titles are refreshed right before the menu opens.
+/// `update(audio:dial:)` changes the icon and the Dial line; other menu titles are refreshed right before the menu opens.
 final class StatusItemController: NSObject, NSMenuDelegate {
     private static let inputMonitoringSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 
     var onToggleMute: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    /// Lets the owner retry a Dial held by another process while the user looks at the menu.
+    var onMenuWillOpen: (() -> Void)?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let dialItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -16,25 +18,29 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let volumeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let muteItem = NSMenuItem(title: "Mute", action: #selector(toggleMute(_:)), keyEquivalent: "")
     private var audio: AudioState?
-    private var isDialConnected = false
+    private var dial = DialConnection.notConnected
 
     override init() {
         super.init()
         buildMenu()
-        update(audio: nil, dialConnected: false)
+        update(audio: nil, dial: .notConnected)
     }
 
-    func update(audio: AudioState?, dialConnected: Bool) {
+    func update(audio: AudioState?, dial: DialConnection) {
         self.audio = audio
-        isDialConnected = dialConnected
+        self.dial = dial
+        // Updated here too, so a retry started by opening the menu shows its result while the menu is open.
+        dialItem.title = Self.title(for: dial)
 
         guard let button = statusItem.button else { return }
         var description = VolumePresentation.accessibilityDescription(for: audio)
-        if !dialConnected {
-            description += ", Surface Dial not connected"
+        switch dial {
+            case .connected: break
+            case .notConnected: description += ", Surface Dial not connected"
+            case .inUseElsewhere: description += ", Surface Dial in use by another app"
         }
         button.image = VolumePresentation.image(for: audio, accessibilityDescription: description)
-        button.appearsDisabled = !dialConnected || audio?.canSetVolume != true
+        button.appearsDisabled = dial != .connected || audio?.canSetVolume != true
     }
 
     func setAccessDenied(_ isDenied: Bool) {
@@ -70,8 +76,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
     }
 
+    func menuWillOpen(_ menu: NSMenu) {
+        onMenuWillOpen?()
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
-        dialItem.title = isDialConnected ? "Surface Dial: Connected" : "Surface Dial: Not Connected"
+        dialItem.title = Self.title(for: dial)
         outputItem.title = "Output: \(audio?.deviceName ?? "None")"
 
         switch audio {
@@ -85,6 +95,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         muteItem.state = audio?.isMuted == true ? .on : .off
         muteItem.isEnabled = audio.map { $0.hasHardwareMute || $0.canSetVolume } ?? false
+    }
+
+    private static func title(for dial: DialConnection) -> String {
+        switch dial {
+            case .connected: "Surface Dial: Connected"
+            case .notConnected: "Surface Dial: Not Connected"
+            case .inUseElsewhere: "Surface Dial: In Use by Another App"
+        }
     }
 
     // MARK: - Actions

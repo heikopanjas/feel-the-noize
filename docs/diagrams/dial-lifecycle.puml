@@ -7,7 +7,11 @@ title DialDevice - Connection Lifecycle
 
 Stopped --> Waiting : start() /\nIOHIDManagerCreate, match 045E:091B, register callbacks,\nschedule on main run loop, open seized (shared fallback)
 
-Waiting --> Connected : device matching callback /\nadopt first Dial, emit connected
+Waiting --> Connected : device matching callback,\nconfiguration accepted /\nadopt first Dial, emit connected
+Waiting --> InUseElsewhere : device matching callback,\nconfiguration refused (exclusive access) /\nemit inUseElsewhere
+InUseElsewhere --> Waiting : device removal callback /\nemit notConnected
+InUseElsewhere --> InUseElsewhere : retry (menu opened, app activated) /\nrebuild HID manager, match again
+InUseElsewhere --> Stopped : stop()
 
 state Connected {
     [*] --> Configuring

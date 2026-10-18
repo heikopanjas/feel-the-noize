@@ -19,18 +19,24 @@ package "App" {
 package "Dial" {
     class DialDevice {
         + onEvent : (DialEvent) -> Void
-        + onConnectionChange : (Bool) -> Void
+        + onConnectionChange : (DialConnection) -> Void
         + onAccessDenied : () -> Void
-        + isConnected : Bool
+        + connection : DialConnection
         + start()
         + stop()
         + configure(detentsPerRevolution : Int, hapticsEnabled : Bool)
+        + retryIfInUseElsewhere()
         + playHaptic(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16)
     }
     class DialReport <<enum>> {
         + {static} parseInput(reportID : UInt32, bytes : [UInt8]) : DialInputReport?
         + {static} hapticConfiguration(detents : Int, enabled : Bool) : [UInt8]
         + {static} manualTrigger(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16) : [UInt8]
+    }
+    class DialConnection <<enum>> {
+        notConnected
+        connected
+        inUseElsewhere
     }
     class DialEvent <<enum>> {
         rotated(detents : Int)
@@ -81,7 +87,8 @@ package "UI" {
     class StatusItemController {
         + onToggleMute : () -> Void
         + onOpenSettings : () -> Void
-        + update(audio : AudioState?, dialConnected : Bool)
+        + onMenuWillOpen : () -> Void
+        + update(audio : AudioState?, dial : DialConnection)
         + setAccessDenied(isDenied : Bool)
     }
     class VolumePresentation <<enum>> {
@@ -120,6 +127,7 @@ AppDelegate *-- Settings
 
 DialDevice ..> DialReport : uses
 DialDevice ..> DialEvent : emits
+DialDevice ..> DialConnection : publishes
 DialDevice ..|> HapticFeedback
 AudioOutput ..|> AudioControlling
 AudioOutput ..> AudioState : publishes

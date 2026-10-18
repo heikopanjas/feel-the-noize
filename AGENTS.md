@@ -125,3 +125,5 @@ Semantic versioning via `MARKETING_VERSION` in `project.yml`; bump `CURRENT_PROJ
 - Release builds pass `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO` and `make release` fails if `get-task-allow` is present. Reason: the first signed build carried that entitlement, which the notary service rejects.
 - Checklist item 13 measured: no measurable CPU time over 60 s while idle.
 - Release build verified running on its own. A second instance cannot open the seized Dial in either mode but still reports it connected; recorded in DESIGN.md §14 R2, fix not yet decided.
+- Fixed: a Dial held exclusively by another process was reported connected. `DialDevice` now adopts a Dial only after it accepts the haptic configuration and publishes a three-state `DialConnection` with `inUseElsewhere`. Retries run when the menu opens or the app becomes active, since IOKit gives no release notification and polling is ruled out. The status menu shows In Use by Another App.
+- Connection fix verified on hardware with two instances: in use elsewhere detected, retry on menu open connected after the holder quit.

@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.onOpenSettings = { [weak self] in
             self?.showSettings()
         }
+        statusItem.onMenuWillOpen = { [weak self] in
+            self?.dial.retryIfInUseElsewhere()
+        }
         self.statusItem = statusItem
 
         settings.onChange = { [weak self] in
@@ -44,9 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Log.control.debug("Dial event: \(String(describing: event), privacy: .public)")
             self?.controller.handle(event)
         }
-        dial.onConnectionChange = { [weak self] isConnected in
-            Log.control.info("Dial \(isConnected ? "connected" : "disconnected", privacy: .public)")
-            if !isConnected {
+        dial.onConnectionChange = { [weak self] connection in
+            Log.control.info("Dial \(String(describing: connection), privacy: .public)")
+            if connection != .connected {
                 self?.controller.reset()
             }
             self?.refreshStatusItem()
@@ -75,8 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.stop()
     }
 
-    /// Retries opening the Dial after the user may have granted Input Monitoring (docs/DESIGN.md §9.2).
+    /// Retries a Dial held by another process, and opening the Dial after the user may have granted Input Monitoring
+    /// (docs/DESIGN.md §9.2).
     func applicationDidBecomeActive(_ notification: Notification) {
+        dial.retryIfInUseElsewhere()
         guard isAccessDenied else { return }
         isAccessDenied = false
         statusItem?.setAccessDenied(false)
@@ -87,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Wiring
 
     private func refreshStatusItem() {
-        statusItem?.update(audio: audio.state, dialConnected: dial.isConnected)
+        statusItem?.update(audio: audio.state, dial: dial.connection)
     }
 
     /// Menu changes go straight to the audio device: no haptics and no overlay, which belong to the Dial.

@@ -121,12 +121,12 @@ The icon is an SF Symbol rendered as a template image:
 | Volume = 0 or muted | `speaker.slash.fill` |
 | Output device without software volume | `speaker.fill`, button `appearsDisabled = true` |
 | No output device | `speaker.fill`, button `appearsDisabled = true` |
-| Dial not connected | current symbol, button `appearsDisabled = true` |
+| Dial not connected, or in use by another app | current symbol, button `appearsDisabled = true` |
 
 ### 5.3 Menu
 
 ```
-Surface Dial: Connected            (disabled info item)
+Surface Dial: Connected            (disabled info item; or Not Connected, or In Use by Another App)
 Output: MacBook Pro Speakers       (disabled info item)
 Volume: 42 %                       (disabled info item)
 ─────────────
@@ -258,14 +258,22 @@ enum DialReport {
     static func manualTrigger(waveform: HapticWaveform, repeatCount: UInt8, retriggerMilliseconds: UInt16) -> [UInt8]
 }
 
+enum DialConnection: Equatable {   // DialConnection.swift
+    case notConnected
+    case connected
+    case inUseElsewhere   // present, but another process holds it exclusively
+}
+
 final class DialDevice: HapticFeedback {
     var onEvent: ((DialEvent) -> Void)?
-    var onConnectionChange: ((Bool) -> Void)?
+    var onConnectionChange: ((DialConnection) -> Void)?
     var onAccessDenied: (() -> Void)?
-    private(set) var isConnected: Bool
+    private(set) var connection: DialConnection
+    var isConnected: Bool { get }   // connection == .connected
 
     func start()
     func stop()
+    func retryIfInUseElsewhere()
     func configure(detentsPerRevolution: Int, hapticsEnabled: Bool)
     func playHaptic(_ waveform: HapticWaveform, repeatCount: UInt8, retriggerMilliseconds: UInt16)
 }
@@ -289,7 +297,15 @@ final class DialDevice: HapticFeedback {
 
 Manual triggers use `IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, 1, bytes, 5)`. `HapticFeedback` conformance maps `endStop()` and `muteToggled(isMuted:)` to the patterns in §7.1 through `playHaptic(_:repeatCount:retriggerMilliseconds:)`; calls while disconnected are ignored. `endStop()` is debounced inside `DialController` (§7.3).
 
-**Recovery.** On `NSWorkspace.didWakeNotification`, and when the input-report callback delivers a non-success `IOReturn`, schedule a rebuild 1 s later: unschedule, close, release, and re-create the manager. A pending rebuild is cancelled and rescheduled if another trigger arrives. Removal resets the button state and emits `onConnectionChange(false)`; `AppDelegate` then calls `DialController.reset()` so an in-flight press never toggles mute.
+**Adoption.** A matching callback alone does not make the Dial usable. When another process has seized it, IOKit still reports the match, but `IOHIDManagerOpen` fails with `kIOReturnExclusiveAccess` in both modes and every report is refused (verified 2026-10-18 with two Manopola instances). The haptic configuration is the first report sent to a matched device, so its result decides:
+
+- success, or a failure such as a Bluetooth timeout: the device is adopted and the state becomes `.connected`;
+- `kIOReturnExclusiveAccess`: the device is remembered as blocked and the state becomes `.inUseElsewhere`; its removal returns the state to `.notConnected`;
+- `kIOReturnNotOpen` or `kIOReturnNotPermitted`: logged, not adopted.
+
+IOKit sends no notification when the other process releases the Dial, and polling is ruled out (NFR-2). `retryIfInUseElsewhere()` therefore rebuilds the manager on occasions the user causes: when the status menu opens and when the app becomes active. The published state is kept during that rebuild so the menu does not flicker; if `IOHIDManagerCopyDevices` then finds no Dial, the state becomes `.notConnected` right away. The Dial's own sleep and wake cycle and Mac wake cause a fresh match as well, which retries implicitly. Verified on hardware 2026-10-18: with two instances, the second reported `.inUseElsewhere` within the same second the first connected; after the first quit, opening the second's menu retried and connected in about 50 ms.
+
+**Recovery.** On `NSWorkspace.didWakeNotification`, and when the input-report callback delivers a non-success `IOReturn`, schedule a rebuild 1 s later: unschedule, close, release, and re-create the manager. A pending rebuild is cancelled and rescheduled if another trigger arrives. Removal resets the button state and emits `onConnectionChange(.notConnected)`; `AppDelegate` then calls `DialController.reset()` so an in-flight press never toggles mute.
 
 ### 7.3 DialController
 
@@ -392,7 +408,7 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 ### 7.5 StatusItemController and VolumeOverlay
 
-- `StatusItemController` creates an `NSStatusItem` with `squareLength`, sets the menu from §5.3 and implements `NSMenuDelegate`. `update(audio:dialConnected:)` changes only the button image and `appearsDisabled`; menu titles are refreshed in `menuNeedsUpdate(_:)`.
+- `StatusItemController` creates an `NSStatusItem` with `squareLength`, sets the menu from §5.3 and implements `NSMenuDelegate`. `update(audio:dial:)` changes the button image, `appearsDisabled` and the Dial status line (so a retry result shows while the menu is open); the other menu titles are refreshed in `menuNeedsUpdate(_:)`. `menuWillOpen(_:)` calls `onMenuWillOpen`, which `AppDelegate` uses for `DialDevice.retryIfInUseElsewhere()`.
 - Images: `NSImage(systemSymbolName:variableValue:accessibilityDescription:)`, `isTemplate = true`. Accessibility description states volume and mute, e.g. "Volume 42 %, muted", plus ", Surface Dial not connected" when applicable. Symbol choice, percentage text ("42 %") and accessibility text live in `VolumePresentation`, shared by the status item and the overlay.
 - `StatusItemController` reports menu actions through `onToggleMute` and `onOpenSettings`; "Allow Input Monitoring…" and "About Manopola" are handled inside it.
 - `VolumeOverlay.show(_:)` is called from `DialController.onAdjusted` and respects the `showOverlay` setting (checked in `AppDelegate`).
@@ -470,6 +486,7 @@ Whether macOS requires Input Monitoring for opening a non-keyboard, non-pointer 
 | No output device at all | `state == nil`; rotation and press ignored |
 | Volume changed by keyboard while overlay visible | overlay is not updated (it only reflects Dial changes) and fades on its own |
 | Two Dials connected | first matched device is used; others ignored and logged |
+| Dial held by another process (another Dial utility, a second Manopola) | state `.inUseElsewhere`, icon dimmed, menu says "In Use by Another App"; retried when the menu opens or the app becomes active (§7.2) |
 | Settings changed while disconnected | stored; applied on next match |
 
 ## 11. Testing
