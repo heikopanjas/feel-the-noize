@@ -17,6 +17,9 @@ final class DialDevice: HapticFeedback {
     // The Dial powers down when idle and may come back with its default configuration.
     private static let idleReconfigurationThreshold: Duration = .seconds(15)
     private static let rebuildDelay: Duration = .seconds(1)
+    // The Dial's buzz waveform is continuous and never ends on its own (docs/DESIGN.md §7.1), so the end stop is cut
+    // to a short pulse with an explicit Stop trigger.
+    private static let endStopBuzzDuration: Duration = .milliseconds(100)
 
     private var manager: IOHIDManager?
     private var device: IOHIDDevice?
@@ -28,6 +31,7 @@ final class DialDevice: HapticFeedback {
     private var hapticsEnabled = true
     private var hasRequestedAccess = false
     private var rebuildTask: Task<Void, Never>?
+    private var buzzStopTask: Task<Void, Never>?
     private var wakeObserver: (any NSObjectProtocol)?
 
     func start() {
@@ -39,6 +43,8 @@ final class DialDevice: HapticFeedback {
     func stop() {
         rebuildTask?.cancel()
         rebuildTask = nil
+        buzzStopTask?.cancel()
+        buzzStopTask = nil
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
@@ -72,6 +78,12 @@ final class DialDevice: HapticFeedback {
 
     func endStop() {
         playHaptic(.buzz)
+        buzzStopTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.endStopBuzzDuration)
+            guard !Task.isCancelled, let self else { return }
+            buzzStopTask = nil
+            sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
+        }
     }
 
     func muteToggled(isMuted: Bool) {
@@ -85,6 +97,13 @@ final class DialDevice: HapticFeedback {
 
     /// Calls while disconnected are ignored.
     func playHaptic(_ waveform: HapticWaveform, repeatCount: UInt8 = 0, retriggerMilliseconds: UInt16 = 0) {
+        // A new waveform replaces a running buzz, so a pending Stop would only cut the new one short.
+        buzzStopTask?.cancel()
+        buzzStopTask = nil
+        sendTrigger(waveform, repeatCount: repeatCount, retriggerMilliseconds: retriggerMilliseconds)
+    }
+
+    private func sendTrigger(_ waveform: HapticWaveform, repeatCount: UInt8, retriggerMilliseconds: UInt16) {
         let bytes = DialReport.manualTrigger(waveform: waveform, repeatCount: repeatCount, retriggerMilliseconds: retriggerMilliseconds)
         sendReport(kIOHIDReportTypeOutput, bytes)
     }

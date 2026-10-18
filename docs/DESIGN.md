@@ -107,7 +107,7 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | Turn while muted | unmute, then step | detent click |
 | Short press | toggle mute | mute: double click; unmute: single click |
 | Press and turn | fine adjust, quarter step per detent; no mute toggle on release | detent click |
-| Turn past 0 % or 100 % | nothing changes | end-stop buzz once; it repeats only after a pause of at least 300 ms between end-stop detents |
+| Turn past 0 % or 100 % | nothing changes | short end-stop buzz (100 ms) once; it repeats only after a pause of at least 300 ms between end-stop detents |
 
 "Reverse direction" in Settings swaps the meaning of clockwise and counter-clockwise.
 
@@ -213,6 +213,15 @@ The delta unit is 1 / *R* of a revolution, where *R* is the resolution multiplie
 
 Waveform ordinals per the descriptor's waveform list: 3 → `0x1003` (Click), 4 → `0x1004` (Buzz Continuous). Ordinals 1 and 2 are the HID-defined None and Stop.
 
+**Observed on hardware (2026-10-18, 36 detents, debug capture of 236 input reports):**
+
+- Input report 1 always arrives as 9 bytes with the report ID first (R1).
+- Byte 1 bit 1 (Digitizer Touch) is set in most reports during normal use, not only on a Surface Studio; the parser already ignores it.
+- Bytes 4–7 are constant `0A 0B 0C 0D`, byte 8 is `0x3A` (58).
+- Every delta is `0x0001`, `0xFFFF` or `0x0000`; fast turns arrive as a quick series of ±1 reports, not as one larger delta.
+- Each button press also sends input report ID 50 (`0x32`), 2 bytes, always `32 02`. It is not part of the layouts above and is ignored.
+- Manual triggers are accepted. Click with repeat 1 at 120 ms plays as a distinct double click. Buzz (ordinal 4) is *continuous*: it keeps playing until another haptic replaces it, such as the next detent click or a manual trigger (R4).
+
 Feature report 2 (Auto Trigger Associated Control = `0x00010037`, the Dial axis) and the vendor collections `0xFF07` (report IDs 42, 48) are not used.
 
 **Haptic patterns used**
@@ -222,7 +231,7 @@ Feature report 2 (Auto Trigger Associated Control = `0x00010037`, the Dial axis)
 | Detent click | automatic, from feature report 1 | — |
 | Unmute | output 1, click, repeat 0 | `01 00 03 00 00` |
 | Mute | output 1, click, repeat 1, 120 ms | `01 01 03 78 00` |
-| End stop | output 1, buzz, repeat 0 | `01 00 04 00 00` |
+| End stop | output 1, buzz, repeat 0; then output 1, Stop, 100 ms later | `01 00 04 00 00`, then `01 00 02 00 00` |
 
 ### 7.2 DialDevice
 
@@ -295,7 +304,7 @@ final class DialDevice: HapticFeedback {
 - whenever `configure(...)` is called (settings changed),
 - on the first input report after 15 s or more without reports. The Dial powers down when idle and may come back with its default configuration; re-sending 8 bytes is cheap and makes this robust.
 
-Manual triggers use `IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, 1, bytes, 5)`. `HapticFeedback` conformance maps `endStop()` and `muteToggled(isMuted:)` to the patterns in §7.1 through `playHaptic(_:repeatCount:retriggerMilliseconds:)`; calls while disconnected are ignored. `endStop()` is debounced inside `DialController` (§7.3).
+Manual triggers use `IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, 1, bytes, 5)`. `HapticFeedback` conformance maps `endStop()` and `muteToggled(isMuted:)` to the patterns in §7.1 through `playHaptic(_:repeatCount:retriggerMilliseconds:)`; calls while disconnected are ignored. `endStop()` is debounced inside `DialController` (§7.3). Because the buzz waveform is continuous (§7.1), `endStop()` schedules a Stop trigger (ordinal 2) 100 ms after the buzz; any other `playHaptic` call within that window cancels the pending Stop, since its waveform replaces the buzz anyway. The user chose this short buzz over the three-click fallback: the Dial's own click feel is sluggish, which makes rapid click patterns hard to tell apart.
 
 **Adoption.** A matching callback alone does not make the Dial usable. When another process has seized it, IOKit still reports the match, but `IOHIDManagerOpen` fails with `kIOReturnExclusiveAccess` in both modes and every report is refused (verified 2026-10-18 with two Manopola instances). The haptic configuration is the first report sent to a matched device, so its result decides:
 
@@ -589,10 +598,10 @@ make notarize     # notarize, staple, Gatekeeper check
 
 | ID | Item | Plan |
 |---|---|---|
-| R1 | Does the input report buffer on macOS include the report ID byte? | parser accepts both; M1 logs the actual shape and the doc is updated. **Open:** raw reports are logged at debug level, which `log show` does not keep; needs a live `log stream --level debug` capture |
+| R1 | Does the input report buffer on macOS include the report ID byte? | parser accepts both; M1 logs the actual shape and the doc is updated. **Answered 2026-10-18:** 9 bytes with the report ID first, in every report of a live debug capture (§7.1) |
 | R2 | Does seizing work for the Dial, and does any open mode require Input Monitoring? | M1 tests seize and shared mode on a clean user account; §9.2 is the fallback. **Partly answered 2026-10-18:** on the developer account the seized open succeeds and reports arrive without an Input Monitoring prompt, while `IOHIDCheckAccess` reports "unknown". The seize is exclusive: a second process gets `kIOReturnExclusiveAccess` (`0xe00002c5`) in seized and in shared mode, yet its matching callback still fires. Clean-account test still open |
-| R3 | Is the delta exactly ±1 per detent after setting the resolution multiplier? | M1 logs raw deltas at 18 and 72 detents; if not, `DialDevice` divides by `3600 / R` with an accumulator. **Confirmed for 36 detents 2026-10-18:** every Dial-driven volume change was exactly one 2 % step, so the multiplier is applied and each report carries ±1. 18 and 72 still to check |
-| R4 | Do manual trigger ordinal 4 (buzz) and repeat/retrigger work as specified? | M1 tries each pattern; fallback for end stop is click with repeat 2 at 40 ms. **Open:** the haptic configuration (feature report 1) is accepted without error; the manual patterns were not yet exercised |
+| R3 | Is the delta exactly ±1 per detent after setting the resolution multiplier? | M1 logs raw deltas at 18 and 72 detents; if not, `DialDevice` divides by `3600 / R` with an accumulator. **Confirmed for 36 detents 2026-10-18:** every Dial-driven volume change was exactly one 2 % step, and a debug capture shows only ±1 deltas, also on fast turns. 18 and 72 still to check |
+| R4 | Do manual trigger ordinal 4 (buzz) and repeat/retrigger work as specified? | M1 tries each pattern; fallback for end stop is click with repeat 2 at 40 ms. **Answered 2026-10-18:** all manual triggers are accepted. Click with repeat and retrigger works (mute double click felt). Buzz does not end on its own: ordinal 4 is Buzz Continuous and keeps vibrating until the next haptic, so the end stop needs the click fallback or an explicit Stop. **Decided and verified 2026-10-18:** short buzz, Stop trigger after 100 ms (§7.2). Stop (ordinal 2) works as a manual trigger; every buzz in a capture was followed by an accepted Stop about 135 ms later, and the buzz ends by itself |
 | R5 | Haptic configuration lost after Dial idle sleep | re-send policy in §7.2 |
 | R6 | Hardware is discontinued | buy a second used unit as a spare once M3 works |
 
