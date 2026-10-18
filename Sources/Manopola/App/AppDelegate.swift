@@ -37,8 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         self.statusItem = statusItem
 
+        audio.preferences = settings
         settings.onChange = { [weak self] in
             self?.applyDialConfiguration()
+            self?.audio.refreshSoftwareVolume()
             // Excluding or including the current output changes the icon.
             self?.refreshStatusItem()
         }

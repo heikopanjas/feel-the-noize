@@ -145,11 +145,32 @@ struct DialControllerTests {
         #expect(abs(fixture.volume() - 0.42) < Self.tolerance)
     }
 
-    @Test func rotationIsIgnoredWithoutSoftwareVolume() {
+    @Test func rotationWithoutVolumeControlBuzzesInsteadOfWriting() {
         let fixture = Fixture(audio: FakeAudio(canSetVolume: false))
         fixture.controller.handle(.rotated(detents: 1))
         #expect(fixture.audio.volumeWrites.isEmpty)
         #expect(fixture.adjustments.isEmpty)
+        #expect(fixture.haptics.endStops == 1)
+    }
+
+    @Test func turningOnADeviceWithoutVolumeControlBuzzesOncePerGesture() {
+        let fixture = Fixture(audio: FakeAudio(canSetVolume: false))
+        for _ in 0 ..< 10 {
+            fixture.controller.handle(.rotated(detents: 1))
+            fixture.clock.advance(by: .milliseconds(100))
+        }
+        #expect(fixture.haptics.endStops == 1)
+        fixture.clock.advance(by: .milliseconds(300))
+        fixture.controller.handle(.rotated(detents: -1))
+        #expect(fixture.haptics.endStops == 2)
+    }
+
+    @Test func pressStillTogglesHardwareMuteWithoutVolumeControl() {
+        let fixture = Fixture(audio: FakeAudio(canSetVolume: false, hasHardwareMute: true))
+        fixture.controller.handle(.pressed)
+        fixture.controller.handle(.released)
+        #expect(fixture.audio.state?.isMuted == true)
+        #expect(fixture.haptics.muteToggles == [true])
     }
 
     @Test func rotationAndPressAreIgnoredWithoutOutputDevice() {
@@ -162,6 +183,7 @@ struct DialControllerTests {
         #expect(fixture.audio.volumeWrites.isEmpty)
         #expect(fixture.audio.muteWrites.isEmpty)
         #expect(fixture.haptics.muteToggles.isEmpty)
+        #expect(fixture.haptics.endStops == 0)
         #expect(fixture.adjustments.isEmpty)
     }
 
@@ -254,6 +276,12 @@ struct DialControllerTests {
         #expect(fixture.audio.muteWrites.isEmpty)
         #expect(fixture.haptics.muteToggles.isEmpty)
         #expect(fixture.adjustments.isEmpty)
+    }
+
+    @Test func excludedDeviceWithoutVolumeControlDoesNotBuzz() {
+        let fixture = Fixture(audio: FakeAudio(canSetVolume: false), settings: Self.excludingFake)
+        fixture.controller.handle(.rotated(detents: 1))
+        #expect(fixture.haptics.endStops == 0)
     }
 
     @Test func excludedDeviceAtTheEndDoesNotBuzz() {

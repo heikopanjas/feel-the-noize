@@ -88,6 +88,31 @@ struct SettingsTests {
         }
     }
 
+    @Test func softwareVolumeIsOptInAndRespectsExclusion() {
+        withSettings { settings, _ in
+            #expect(!settings.wantsSoftwareVolume("m2"))
+            settings.setSoftwareVolume("m2", enabled: true)
+            #expect(settings.softwareVolumeDeviceUIDs == ["m2"])
+            #expect(settings.wantsSoftwareVolume("m2"))
+            settings.setDevice("m2", enabled: false)
+            #expect(!settings.wantsSoftwareVolume("m2"))
+            settings.setSoftwareVolume("m2", enabled: false)
+            #expect(settings.softwareVolumeDeviceUIDs.isEmpty)
+        }
+    }
+
+    @Test func softwareVolumeLevelStartsFullAndIsStoredWithoutOnChange() {
+        withSettings { settings, _ in
+            var changes = 0
+            settings.onChange = { changes += 1 }
+            #expect(settings.softwareVolumeLevel("m2") == 1)
+            settings.setSoftwareVolumeLevel("m2", 0.42)
+            #expect(abs(settings.softwareVolumeLevel("m2") - 0.42) < 0.000_01)
+            #expect(settings.softwareVolumeLevel("other") == 1)
+            #expect(changes == 0)
+        }
+    }
+
     @Test func everyWriteCallsOnChange() {
         withSettings { settings, _ in
             var changes = 0

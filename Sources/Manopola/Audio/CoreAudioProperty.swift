@@ -1,5 +1,6 @@
 import AudioToolbox
 import CoreAudio
+import Foundation
 
 /// Typed access to the Core Audio properties Manopola reads and writes, shared by `AudioOutput` and `AudioDeviceList`.
 enum CoreAudioProperty {
@@ -117,6 +118,36 @@ enum CoreAudioProperty {
 
     static func readTransportType(of deviceID: AudioObjectID) -> UInt32 {
         (try? readUInt32(kAudioDevicePropertyTransportType, of: deviceID)) ?? 0
+    }
+
+    // MARK: - Software Volume
+
+    /// The Core Audio process object of Manopola itself, so a tap can leave its own audio out.
+    static func readOwnProcessObject() throws -> AudioObjectID {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var pid = ProcessInfo.processInfo.processIdentifier
+        var processObject = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        try AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<pid_t>.size), &pid, &size, &processObject
+        )
+        .throwIfError("Looking up the own process object")
+        return processObject
+    }
+
+    /// Channel count of each buffer the device delivers in an IO cycle, in buffer order.
+    static func readBufferChannelCounts(of deviceID: AudioObjectID, scope: AudioObjectPropertyScope) throws -> [Int] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        try AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size).throwIfError("Reading the stream configuration size")
+        let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        try AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, raw).throwIfError("Reading the stream configuration")
+        let buffers = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+        return buffers.map { Int($0.mNumberChannels) }
     }
 
     private static func readUInt32(_ selector: AudioObjectPropertySelector, of deviceID: AudioObjectID) throws -> UInt32 {

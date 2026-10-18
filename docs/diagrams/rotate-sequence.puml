@@ -26,7 +26,11 @@ alt muted
 end
 Controller -> Audio : setVolume(v)
 activate Audio
-Audio -> CoreAudio : AudioObjectSetPropertyData\n(VirtualMainVolume)
+alt device has volume control
+    Audio -> CoreAudio : AudioObjectSetPropertyData\n(VirtualMainVolume)
+else software volume (§7.9)
+    Audio -> Audio : SoftwareVolume.level = v\n(IO thread ramps the tap's audio to the new gain)
+end
 Audio -> Audio : update cached state
 deactivate Audio
 opt volume already at 0 or 1

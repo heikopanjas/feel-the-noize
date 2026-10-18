@@ -1,5 +1,12 @@
 import CoreAudio
 
+/// Where `AudioOutput` learns whether a device should get software volume and keeps its level; `Settings` conforms.
+protocol SoftwareVolumePreferences: AnyObject {
+    func wantsSoftwareVolume(_ uid: String) -> Bool
+    func softwareVolumeLevel(_ uid: String) -> Float
+    func setSoftwareVolumeLevel(_ uid: String, _ level: Float)
+}
+
 /// Wraps Core Audio for the current default output device (docs/DESIGN.md §7.4).
 ///
 /// Listener blocks are registered on the main queue, so all notifications arrive on the main thread.
@@ -10,7 +17,13 @@ final class AudioOutput: AudioControlling {
     /// `nil` when there is no output device.
     private(set) var state: AudioState?
     var onChange: ((AudioState?) -> Void)?
+    weak var preferences: (any SoftwareVolumePreferences)?
+    /// Set when software volume could not start, for example because audio recording permission is missing.
+    private(set) var softwareVolumeError: String?
 
+    private let softwareVolume = SoftwareVolume()
+    /// A device whose software volume failed to start is not retried on every refresh, only after a settings change.
+    private var failedSoftwareVolumeUID: String?
     private var observedDeviceID: AudioObjectID?
     private var systemListener: CoreAudioProperty.ListenerBlock?
     private var deviceListener: CoreAudioProperty.ListenerBlock?
@@ -47,15 +60,25 @@ final class AudioOutput: AudioControlling {
             AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, systemListener)
         }
         detachFromDevice()
+        softwareVolume.stop()
         systemListener = nil
         deviceListener = nil
+    }
+
+    /// Re-evaluates software volume after its settings changed, and retries a start that failed.
+    func refreshSoftwareVolume() {
+        failedSoftwareVolumeUID = nil
+        refresh()
     }
 
     func setVolume(_ volume: Float32) {
         guard var state, state.canSetVolume else { return }
         let volume = min(max(volume, 0), 1)
         do {
-            try CoreAudioProperty.writeVolume(volume, of: state.deviceID)
+            try writeVolume(volume, state: state)
+            if state.isSoftwareVolume {
+                preferences?.setSoftwareVolumeLevel(state.deviceUID, volume)
+            }
             state.volume = volume
             if !state.hasHardwareMute, volume > 0, emulatedMuteVolumes.removeValue(forKey: state.deviceUID) != nil {
                 state.isMuted = false
@@ -97,7 +120,7 @@ final class AudioOutput: AudioControlling {
             // Stored before writing so the listener round-trip already sees the device as muted.
             emulatedMuteVolumes[state.deviceUID] = state.volume
             do {
-                try CoreAudioProperty.writeVolume(0, of: state.deviceID)
+                try writeVolume(0, state: state)
             }
             catch {
                 emulatedMuteVolumes[state.deviceUID] = nil
@@ -107,8 +130,45 @@ final class AudioOutput: AudioControlling {
         }
         else {
             let restored = emulatedMuteVolumes.removeValue(forKey: state.deviceUID) ?? state.volume
-            try CoreAudioProperty.writeVolume(restored, of: state.deviceID)
+            try writeVolume(restored, state: state)
             state.volume = restored
+        }
+    }
+
+    private func writeVolume(_ volume: Float32, state: AudioState) throws {
+        if state.isSoftwareVolume {
+            softwareVolume.level = volume
+        }
+        else {
+            try CoreAudioProperty.writeVolume(volume, of: state.deviceID)
+        }
+    }
+
+    // MARK: - Software Volume
+
+    /// Starts or stops software volume so it runs exactly for a default output that lacks volume control and is opted in.
+    /// Returns whether it runs for `uid`.
+    private func reconcileSoftwareVolume(uid: String?, nativeCanSetVolume: Bool) -> Bool {
+        guard let uid, !nativeCanSetVolume, let preferences, preferences.wantsSoftwareVolume(uid) else {
+            softwareVolume.stop()
+            return false
+        }
+        if softwareVolume.deviceUID == uid {
+            return true
+        }
+        if failedSoftwareVolumeUID == uid {
+            return false
+        }
+        do {
+            try softwareVolume.start(deviceUID: uid, level: preferences.softwareVolumeLevel(uid))
+            softwareVolumeError = nil
+            return true
+        }
+        catch {
+            Log.audio.error("Software volume could not start: \(error, privacy: .public)")
+            failedSoftwareVolumeUID = uid
+            softwareVolumeError = String(describing: error)
+            return false
         }
     }
 
@@ -157,6 +217,7 @@ final class AudioOutput: AudioControlling {
     /// Re-reads the full state; `onChange` fires only when it differs from the cached one.
     private func refresh() {
         guard let deviceID = observedDeviceID else {
+            _ = reconcileSoftwareVolume(uid: nil, nativeCanSetVolume: true)
             publish(nil)
             return
         }
@@ -187,9 +248,17 @@ final class AudioOutput: AudioControlling {
     private func readState(of deviceID: AudioObjectID) throws -> AudioState {
         let uid = try CoreAudioProperty.readString(kAudioDevicePropertyDeviceUID, of: deviceID)
         let name = try CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID)
-        let canSetVolume = CoreAudioProperty.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID)
-        // Without software volume the device plays at its fixed level, which is shown as full.
-        var volume = canSetVolume ? try CoreAudioProperty.readVolume(of: deviceID) : 1
+        let nativeCanSetVolume = CoreAudioProperty.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID)
+        let isSoftwareVolume = reconcileSoftwareVolume(uid: uid, nativeCanSetVolume: nativeCanSetVolume)
+        let canSetVolume = nativeCanSetVolume || isSoftwareVolume
+        // Without any volume control the device plays at its fixed level, which is shown as full.
+        var volume: Float32
+        if nativeCanSetVolume {
+            volume = try CoreAudioProperty.readVolume(of: deviceID)
+        }
+        else {
+            volume = isSoftwareVolume ? softwareVolume.level : 1
+        }
         let hasHardwareMute = CoreAudioProperty.isSettable(CoreAudioProperty.muteAddress, of: deviceID)
 
         let isMuted: Bool
@@ -210,7 +279,7 @@ final class AudioOutput: AudioControlling {
 
         return AudioState(
             deviceID: deviceID, deviceUID: uid, deviceName: name, volume: volume, isMuted: isMuted, canSetVolume: canSetVolume,
-            hasHardwareMute: hasHardwareMute)
+            hasHardwareMute: hasHardwareMute, isSoftwareVolume: isSoftwareVolume)
     }
 
     // MARK: - Property Addresses

@@ -19,6 +19,7 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
         case connection
         case volume
         case mute
+        case software
 
         var title: String {
             switch self {
@@ -27,22 +28,24 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
                 case .connection: "Connection"
                 case .volume: "Volume Control"
                 case .mute: "Mute"
+                case .software: "Software Volume"
             }
         }
 
         var width: CGFloat {
             switch self {
                 case .use: 36
-                case .device: 230
+                case .device: 200
                 case .connection: 100
                 case .volume: 100
                 case .mute: 70
+                case .software: 110
             }
         }
     }
 
     private static let margin: CGFloat = 20
-    private static let contentSize = NSSize(width: 620, height: 330)
+    private static let contentSize = NSSize(width: 740, height: 350)
 
     private let settings: Settings
     private let deviceList = AudioDeviceList()
@@ -83,7 +86,9 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
 
         let footnote = NSTextField(
             wrappingLabelWithString:
-                "The Dial controls the current output only when it is ticked. Devices without volume control can only be muted.")
+                "The Dial controls the current output only when it is ticked under Use. For devices without volume control, Software "
+                + "Volume adjusts the audio sent to them; it needs permission to record system audio and adds a few milliseconds "
+                + "of latency.")
         footnote.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         footnote.textColor = .secondaryLabelColor
 
@@ -164,17 +169,27 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
                 return textCell(row.device.map { $0.canSetVolume ? "Yes" : "No" } ?? "–", row: row)
             case .mute:
                 return textCell(row.device.map(Self.muteLabel) ?? "–", row: row)
+            case .software:
+                return softwareVolumeCheckbox(for: row, at: index)
         }
     }
 
     private func useCheckbox(for row: Row, at index: Int) -> NSView {
         let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleDevice(_:)))
         checkbox.tag = index
-        // Remembered devices stay configurable; a connected device without volume and mute has nothing to control.
-        let isControllable = row.device?.isControllable ?? true
-        checkbox.isEnabled = isControllable
-        checkbox.state = isControllable && settings.isDeviceEnabled(row.uid) ? .on : .off
+        // Every device can be selected: one without volume control can still get software volume.
+        checkbox.state = settings.isDeviceEnabled(row.uid) ? .on : .off
         checkbox.setAccessibilityLabel("Use \(row.name)")
+        return Self.centered(checkbox)
+    }
+
+    private func softwareVolumeCheckbox(for row: Row, at index: Int) -> NSView {
+        let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleSoftwareVolume(_:)))
+        checkbox.tag = index
+        // Only for connected devices without volume control; remembered devices show their stored choice.
+        checkbox.isEnabled = row.device.map { !$0.canSetVolume } ?? false
+        checkbox.state = settings.softwareVolumeDeviceUIDs.contains(row.uid) ? .on : .off
+        checkbox.setAccessibilityLabel("Software volume for \(row.name)")
         return Self.centered(checkbox)
     }
 
@@ -241,5 +256,10 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     @objc private func toggleDevice(_ sender: NSButton) {
         guard rows.indices.contains(sender.tag) else { return }
         settings.setDevice(rows[sender.tag].uid, enabled: sender.state == .on)
+    }
+
+    @objc private func toggleSoftwareVolume(_ sender: NSButton) {
+        guard rows.indices.contains(sender.tag) else { return }
+        settings.setSoftwareVolume(rows[sender.tag].uid, enabled: sender.state == .on)
     }
 }

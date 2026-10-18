@@ -44,6 +44,8 @@ final class AudioDeviceList {
             devices = try CoreAudioProperty.readDeviceIDs()
                 .filter { CoreAudioProperty.hasOutputStreams($0) && !CoreAudioProperty.isHidden($0) }
                 .compactMap(Self.describe)
+                // A private aggregate is visible to the process that made it; the software volume one is internal.
+                .filter { !$0.uid.hasPrefix(SoftwareVolume.aggregateUIDPrefix) }
         }
         catch {
             Log.audio.error("\(error, privacy: .public)")

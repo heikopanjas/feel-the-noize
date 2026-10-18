@@ -97,7 +97,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             case .some(let state) where !state.canSetVolume:
                 volumeItem.title = "Volume: not adjustable"
             case .some(let state):
-                volumeItem.title = "Volume: \(VolumePresentation.percent(state.volume))"
+                let suffix = state.isSoftwareVolume ? " (software)" : ""
+                volumeItem.title = "Volume: \(VolumePresentation.percent(state.volume))\(suffix)"
         }
 
         muteItem.state = audio?.isMuted == true ? .on : .off

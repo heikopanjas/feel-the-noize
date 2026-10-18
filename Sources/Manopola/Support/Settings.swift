@@ -21,6 +21,8 @@ final class Settings {
         static let showOverlay = "showOverlay"
         static let excludedOutputDevices = "excludedOutputDevices"
         static let knownOutputDevices = "knownOutputDevices"
+        static let softwareVolumeDevices = "softwareVolumeDevices"
+        static let softwareVolumeLevels = "softwareVolumeLevels"
     }
 
     private static let defaultDetents = 36
@@ -100,6 +102,26 @@ final class Settings {
         defaults.dictionary(forKey: Key.knownOutputDevices) as? [String: String] ?? [:]
     }
 
+    // MARK: - Software Volume
+
+    /// Devices without volume control on which the user turned on software volume (docs/DESIGN.md §7.9).
+    var softwareVolumeDeviceUIDs: Set<String> {
+        get { Set(defaults.stringArray(forKey: Key.softwareVolumeDevices) ?? []) }
+        set { write(newValue.sorted(), forKey: Key.softwareVolumeDevices) }
+    }
+
+    func setSoftwareVolume(_ uid: String, enabled: Bool) {
+        var uids = softwareVolumeDeviceUIDs
+        if enabled {
+            uids.insert(uid)
+        }
+        else {
+            uids.remove(uid)
+        }
+        guard uids != softwareVolumeDeviceUIDs else { return }
+        softwareVolumeDeviceUIDs = uids
+    }
+
     /// Writes, and so calls `onChange`, only when a device or name is new.
     func rememberDevices(_ names: [String: String]) {
         let known = knownDevices
@@ -115,5 +137,27 @@ final class Settings {
 
     private static func validated(_ value: Int, in choices: [Int], fallback: Int) -> Int {
         choices.contains(value) ? value : fallback
+    }
+}
+
+// MARK: - Software Volume Preferences
+
+extension Settings: SoftwareVolumePreferences {
+    /// An excluded device is left alone entirely, software volume included.
+    func wantsSoftwareVolume(_ uid: String) -> Bool {
+        softwareVolumeDeviceUIDs.contains(uid) && isDeviceEnabled(uid)
+    }
+
+    /// Starts at full level, so turning software volume on changes nothing audible.
+    func softwareVolumeLevel(_ uid: String) -> Float {
+        let levels = defaults.dictionary(forKey: Key.softwareVolumeLevels) as? [String: Double] ?? [:]
+        return Float(min(max(levels[uid] ?? 1, 0), 1))
+    }
+
+    /// Written on every Dial step, so it bypasses `onChange` to avoid a settings refresh per detent.
+    func setSoftwareVolumeLevel(_ uid: String, _ level: Float) {
+        var levels = defaults.dictionary(forKey: Key.softwareVolumeLevels) as? [String: Double] ?? [:]
+        levels[uid] = Double(level)
+        defaults.set(levels, forKey: Key.softwareVolumeLevels)
     }
 }

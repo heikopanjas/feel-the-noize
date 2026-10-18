@@ -84,6 +84,8 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-10 | Optional on-screen overlay for Dial-initiated changes. |
 | FR-11 | Settings window for all options in §7.7. |
 | FR-12 | Launch at login. |
+| FR-14 | Devices without volume control can get software volume, opt-in per device: the Dial then controls a software gain applied to the audio sent to the device (§7.9). |
+| FR-15 | Turning the Dial on a device it cannot control plays the end-stop buzz once per gesture, so the user knows nothing will change. |
 | FR-13 | A Devices settings tab lists every output device with its connection type and whether it supports volume control and mute; the user selects which devices the Dial works with. New devices are selected by default. On an unselected default output, turning and pressing do nothing. |
 
 ### Non-Functional
@@ -91,7 +93,7 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | ID | Requirement |
 |---|---|
 | NFR-1 | Latency from HID report to Core Audio call under 5 ms on the main thread. |
-| NFR-2 | No timers or polling while idle; idle CPU is 0 %. |
+| NFR-2 | No timers or polling while idle; idle CPU is 0 %. Exception: while software volume runs (opt-in, §7.9), audio IO runs continuously. |
 | NFR-3 | Builds clean in Swift 6 language mode with complete concurrency checking. |
 | NFR-4 | Passes `swift-format lint` with the repository `.swift-format`. |
 | NFR-5 | No third-party packages. Frameworks: AppKit, IOKit, CoreAudio, AudioToolbox, ServiceManagement, OSLog. |
@@ -357,7 +359,7 @@ final class DialController {
 
 **Gesture state:** `idle`, `pressedStill`, `pressedTurned` (see diagram). Rules:
 
-1. `rotated(n)`: if `reverseDirection`, `n = -n`. Step size is `stepPercent / 100`, or a quarter of it while pressed. If there is no state, `canSetVolume == false`, or the device UID is in `excludedDeviceUIDs` (§7.6), do nothing. If muted, call `setMuted(false)` first. Compute the new volume with `VolumeStepper`. If it equals the current volume and the current volume is at 0 or 1 in the direction of travel, call `haptics.endStop()`, debounced with `now`: the buzz plays only if the previous end-stop detent is at least 300 ms old, so a continuous spin past the end buzzes once (checklist item 5). Otherwise `setVolume`. The step is computed from the state after unmuting, because unmuting an emulated mute restores the remembered volume. Then call `onAdjusted(audio.state)`. Rotating while pressed moves to `pressedTurned` even when the volume cannot change, so the release never toggles mute.
+1. `rotated(n)`: if `reverseDirection`, `n = -n`. Step size is `stepPercent / 100`, or a quarter of it while pressed. If there is no state or the device UID is in `excludedDeviceUIDs` (§7.6), do nothing. If `canSetVolume == false`, play the debounced end-stop buzz (FR-15) and change nothing. If muted, call `setMuted(false)` first. Compute the new volume with `VolumeStepper`. If it equals the current volume and the current volume is at 0 or 1 in the direction of travel, call `haptics.endStop()`, debounced with `now`: the buzz plays only if the previous end-stop detent is at least 300 ms old, so a continuous spin past the end buzzes once (checklist item 5). Otherwise `setVolume`. The step is computed from the state after unmuting, because unmuting an emulated mute restores the remembered volume. Then call `onAdjusted(audio.state)`. Rotating while pressed moves to `pressedTurned` even when the volume cannot change, so the release never toggles mute.
 2. `pressed` → `pressedStill`.
 3. `released` in `pressedStill` → if the device UID is in `excludedDeviceUIDs`, do nothing; otherwise toggle mute, `haptics.muteToggled(isMuted:)` with the new state, `onAdjusted`. In `pressedTurned` → only return to `idle`.
 4. `reset()` → `idle`.
@@ -445,15 +447,16 @@ Programmatic `NSWindowController` whose content is an `NSTabViewController` with
 
 Changes apply immediately (no Apply button). When `LoginItem.status == .requiresApproval`, a small label and a button "Open Login Items…" (`SMAppService.openSystemSettingsLoginItems()`) appear below the checkbox. The checkbox shows on for both `.enabled` and `.requiresApproval`, since the app is registered in both cases. The view controller re-reads all values in `viewWillAppear()`, because launch at login can change in System Settings, and sets `preferredContentSize` to its fitting size so the tab view does not stretch the grid.
 
-**Devices tab:** a view-based `NSTableView` (620 × 330 pt content, alternating rows, no selection) with a footnote "The Dial controls the current output only when it is ticked. Devices without volume control can only be muted."
+**Devices tab:** a view-based `NSTableView` (740 × 350 pt content, alternating rows, no selection) with a footnote "The Dial controls the current output only when it is ticked. Devices without volume control can only be muted."
 
 | Column | Content |
 |---|---|
-| Use | checkbox; off and disabled for a connected device with neither volume nor mute |
+| Use | checkbox; enabled for every device, since one without volume control can still get software volume |
 | Device | name; `speaker.wave.2.fill` marks the current default output |
 | Connection | Built-in, Bluetooth, USB, HDMI, DisplayPort, AirPlay, Thunderbolt, Virtual, Aggregate, Other; "Not connected" for remembered devices |
 | Volume Control | Yes / No; – when not connected |
 | Mute | Yes (hardware), Emulated (volume only, §7.4), No; – when not connected |
+| Software Volume | checkbox; enabled only for connected devices without native volume; remembered devices show their stored choice (§7.9) |
 
 Connected devices come first, then remembered devices from `Settings.knownDevices` that are absent, each sorted by name; remembered rows use the secondary label color and stay toggleable. Each device-list change calls `Settings.rememberDevices`; `AppDelegate` also remembers every default output it sees, so devices used while the tab was closed are listed too. Toggling a checkbox calls `Settings.setDevice(_:enabled:)`, and `AppDelegate` refreshes the status item on every settings change.
 
@@ -470,6 +473,8 @@ Connected devices come first, then remembered devices from `Settings.knownDevice
 | `showOverlay` | Bool | true | — |
 | `excludedOutputDevices` | [String] | [] | Core Audio device UIDs the Dial leaves alone; stored as exclusions so new devices are enabled |
 | `knownOutputDevices` | [String: String] | [:] | UID to name of every output seen; written only when something is new |
+| `softwareVolumeDevices` | [String] | [] | device UIDs with software volume turned on (§7.9) |
+| `softwareVolumeLevels` | [String: Double] | [:] | last software level per device, 1.0 when absent; written per Dial step without `onChange` |
 
 Out-of-range stored values fall back to the default. Launch at login is not stored; `SMAppService.mainApp.status` is the source of truth (`register()` / `unregister()` in `LoginItem`, a caseless enum).
 
@@ -477,12 +482,45 @@ Out-of-range stored values fall back to the default. Launch at login is not stor
 
 `os.Logger(subsystem: "com.panjas.Manopola", category:)` with categories `dial`, `audio`, `control`, `ui`. Raw report bytes are logged at `.debug` only. No log files, no telemetry.
 
+### 7.9 Software Volume
+
+Some outputs expose no volume or mute control at all, for example the MOTU M2 and many HDMI outputs. For those, the user can turn on software volume per device in the Devices tab (§7.6). Options evaluated on 2026-10-18: a process tap with software gain (chosen), a virtual audio driver (too heavy: admin install, C++ driver, upkeep), mute only through a tap (no volume), DDC/CI for monitors (private API, displays only), and feedback only (added as well, see FR-15).
+
+**Mechanism.** `SoftwareVolume` runs for one device `D`, the default output:
+
+1. A process tap, `CATapDescription(excludingProcesses: [own process], deviceUID: D, stream: 0)` with `muteBehavior = .muted` and `isPrivate = true`, captures what other apps send to `D` and keeps it from reaching the hardware. Manopola's own process object (`kAudioHardwarePropertyTranslatePIDToProcessObject`) is excluded, so its playback into the aggregate does not feed back.
+2. A private aggregate device (UID prefix `com.panjas.Manopola.software-volume.`) has `D` as main sub-device and the tap in its tap list, with `tapautostart` and drift compensation. `AudioDeviceList` filters this prefix, because a private aggregate is visible to its own process.
+3. An IO block (`AudioDeviceCreateIOProcIDWithBlock`, queue `nil`, so the HAL IO thread) copies the tap buffer, the last input buffer of the aggregate, into the first output buffer, multiplied by the gain and ramped linearly across the buffer. Other output buffers are zeroed. The block allocates nothing, takes no locks and does not log.
+
+Teardown reverses the order: stop and destroy the IO proc, destroy the aggregate, then the tap.
+
+**Gain.** `SoftwareGain.amplitude(for:)` maps the level 0…1 evenly onto 50 dB: 0 is silence, 1 is unity, 0.5 is −25 dB. The main actor sets the target and the IO thread ramps towards it; both share it as Float bit patterns in `Synchronization.Atomic<UInt32>` inside a `nonisolated final class` with only `let` properties (§8).
+
+**Integration.** `AudioOutput` reconciles on every state read: software volume runs exactly when the default output has no native volume and `SoftwareVolumePreferences.wantsSoftwareVolume(uid)` is true (opted in and not excluded). It then reports `canSetVolume = true`, `isSoftwareVolume = true`, and `volume` as the software level; mute without a hardware mute control reuses emulated mute (§7.4) through level 0. `setVolume` stores the level per device without `onChange` (§7.7); emulated-mute writes are not stored, so a restart comes back unmuted at the previous level. A start that fails is not retried on every refresh, only after the next settings change (`refreshSoftwareVolume()`); the error is kept in `softwareVolumeError`. `applicationWillTerminate` stops it.
+
+**Permission.** Taps need the system audio recording permission. Its prompt text comes from `NSAudioCaptureUsageDescription`, which Xcode has no `INFOPLIST_KEY_` setting for; `project.yml` therefore generates `Configuration/Manopola-Info.plist`, which Xcode merges with the generated Info.plist.
+
+**Costs.** System audio recording permission; about one IO buffer of added latency, also for a DAW playing to the device; continuous IO, so CPU is not 0 % while active (opt-in exception to NFR-2); the level jumps back to full if Manopola quits or crashes; keyboard volume keys still show "not adjustable" for these devices.
+
+**Hardware checkpoint (2026-10-18, MOTU M2, debug capture):**
+
+| ID | Result |
+|---|---|
+| S1 | Works. The aggregate delivers input buffers `[2, 2]` (M2 inputs, then the tap) and one 2-channel output buffer. Level changes, mute and unmute work; the end-stop buzz also fires at 100 % software level. |
+| S2 | Permission granted; prompt timing and behavior when denied deferred by the developer. |
+| S3 | Added latency deferred by the developer. |
+| S4 | Sample-rate change, unplugging and sleep deferred by the developer. |
+| S5 | A normal quit stops software volume (taps created and destroyed balance); the relaunch restores the stored level. A force-quit during playback returns the audio to full level without intervention, so macOS removes the tap with the process. |
+| S6 | Level felt even across the range (reported by the developer). |
+| S7, S8 | Logic Pro latency and small-buffer behavior deferred by the developer. If they matter for recording, a per-app bypass excludes such apps from the tap (planned, not built). |
+
 ## 8. Concurrency Model
 
 - The target builds in Swift 6 language mode with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`; every type in the app is main-actor isolated. The workload — a few HID reports per second and a Core Audio call each — does not justify background work.
 - IOKit HID callbacks are `@convention(c)` functions without captures, declared at file scope as `nonisolated`. Because the manager is scheduled on the main run loop, they run on the main thread; they recover the object from the context pointer and call into it inside `MainActor.assumeIsolated { }`.
 - Core Audio listener blocks are registered on `DispatchQueue.main` and use `MainActor.assumeIsolated` the same way.
 - The callbacks resolve the `DialDevice` from the context pointer before entering the actor; as a main-actor class it is Sendable. The non-Sendable `IOHIDDevice` argument is passed through a `nonisolated(unsafe) let`, which is sound because it never leaves the main thread.
+- The one exception is the software volume IO block (§7.9). It runs on the HAL IO thread, is created in a `nonisolated static` function, and shares only the gain through `Synchronization.Atomic` in a `nonisolated final class` with `let` properties, which is checked `Sendable`.
 - No `@unchecked Sendable`, no locks, no `DispatchQueue.async` hops.
 
 ## 9. Permissions, Signing, Distribution
@@ -521,7 +559,10 @@ Whether macOS requires Input Monitoring for opening a non-keyboard, non-pointer 
 | Settings changed while disconnected | stored; applied on next match |
 | Default output is unselected in the Devices tab | turning and pressing do nothing, also no end-stop buzz; icon dimmed, menu shows "(Dial off)"; menu Mute still works |
 | Remembered device reconnects | its row moves back to the connected section with its selection unchanged |
-| Device with neither volume nor mute (e.g. MOTU M2) | checkbox disabled; as default output the Dial does nothing (existing "not adjustable" state) |
+| Device with neither volume nor mute (e.g. MOTU M2) | without software volume: turning buzzes once per gesture and changes nothing; with software volume: full control (§7.9) |
+| Manopola quits or crashes while software volume runs | the tap disappears and the level returns to full |
+| Software volume cannot start (e.g. permission denied) | logged, the device stays "not adjustable"; retried after the next settings change |
+| A DAW plays to a device with software volume | its audio is tapped too: attenuated and delayed by about one buffer (§7.9, S7) |
 
 ## 11. Testing
 
@@ -549,9 +590,10 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 |---|---|
 | `DialReportTests` | parsing both buffer shapes; clockwise `01 00 01 00 …` → +1; counter-clockwise `01 00 FF FF …` → −1; pressed `01 01 00 00 …`; wrong ID or length → `nil`; exact bytes of the feature report (36 detents, haptics on → `01 24 00 00 03 00 00 00`) and of the three manual patterns in §7.1 |
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
-| `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite |
+| `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange` |
 | `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
-| `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle |
+| `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
+| `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture |
 
 `DialDevice`, `AudioOutput` and the UI are thin adapters over system frameworks and are covered by the manual checklist.
 
@@ -576,6 +618,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 ```
 Manopola/
 ├── project.yml                    XcodeGen spec (the .xcodeproj is generated, not committed)
+├── Configuration/                 Manopola-Info.plist, generated by XcodeGen for keys without a build setting
 ├── Makefile                       build, test, lint, diagrams, icon, release, notarize
 ├── scripts/render-icon.swift      draws the app icon into AppIcon.appiconset
 ├── AGENTS.md / CLAUDE.md          agent instructions
@@ -587,7 +630,8 @@ Manopola/
 │   ├── Dial/                      DialDevice.swift, DialReport.swift, DialEvent.swift
 │   ├── Control/                   DialController.swift, VolumeStepper.swift
 │   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift,
-│   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift
+│   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift,
+│   │                              SoftwareVolume.swift, SoftwareGain.swift
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
 │   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
 │   │                              DeviceSettingsViewController.swift, VolumePresentation.swift
@@ -631,6 +675,7 @@ make notarize     # notarize, staple, Gatekeeper check
 | R4 | Do manual trigger ordinal 4 (buzz) and repeat/retrigger work as specified? | M1 tries each pattern; fallback for end stop is click with repeat 2 at 40 ms. **Answered 2026-10-18:** all manual triggers are accepted. Click with repeat and retrigger works (mute double click felt). Buzz does not end on its own: ordinal 4 is Buzz Continuous and keeps vibrating until the next haptic, so the end stop needs the click fallback or an explicit Stop. **Decided and verified 2026-10-18:** short buzz, Stop trigger after 100 ms (§7.2). Stop (ordinal 2) works as a manual trigger; every buzz in a capture was followed by an accepted Stop about 135 ms later, and the buzz ends by itself |
 | R5 | Haptic configuration lost after Dial idle sleep | re-send policy in §7.2 |
 | R6 | Hardware is discontinued | buy a second used unit as a spare once M3 works |
+| R7 | Software volume adds latency for DAWs and depends on a permission | opt-in per device; checkpoint S2, S3, S7, S8 (§7.9); per-app bypass if recording timing suffers |
 
 ## 15. Future Ideas
 

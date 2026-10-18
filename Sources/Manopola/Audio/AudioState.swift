@@ -10,4 +10,6 @@ struct AudioState: Equatable {
     var isMuted: Bool
     var canSetVolume: Bool
     var hasHardwareMute: Bool
+    /// The volume is Manopola's software gain, because the device has no volume control of its own (§7.9).
+    var isSoftwareVolume = false
 }

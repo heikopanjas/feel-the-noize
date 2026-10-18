@@ -88,6 +88,20 @@ package "Audio" {
         + {static} readVolume / writeVolume
         + {static} readMute / writeMute
     }
+    class SoftwareVolume {
+        + deviceUID : String?
+        + level : Float
+        + start(deviceUID : String, level : Float)
+        + stop()
+    }
+    class SoftwareGain <<enum>> {
+        + {static} amplitude(for : Float) : Float
+    }
+    interface SoftwareVolumePreferences {
+        + wantsSoftwareVolume(uid : String) : Bool
+        + softwareVolumeLevel(uid : String) : Float
+        + setSoftwareVolumeLevel(uid : String, level : Float)
+    }
     class AudioOutput {
         + onChange : (AudioState?) -> Void
         + start()
@@ -174,6 +188,11 @@ DeviceSettingsViewController *-- AudioDeviceList
 DeviceSettingsViewController ..> Settings : selects devices
 AudioDeviceList ..> AudioDeviceInfo : lists
 AudioOutput ..> CoreAudioProperty : uses
+AudioOutput *-- SoftwareVolume
+AudioOutput --> SoftwareVolumePreferences
+SoftwareVolume ..> SoftwareGain : uses
+SoftwareVolume ..> CoreAudioProperty : uses
+Settings ..|> SoftwareVolumePreferences
 AudioDeviceList ..> CoreAudioProperty : uses
 
 @enduml

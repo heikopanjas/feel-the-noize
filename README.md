@@ -50,7 +50,16 @@ Settings has two tabs.
 | Show volume overlay | on or off | on |
 | Launch at login | on or off | off |
 
-**Devices** lists every audio output with its connection type and whether it supports volume control and mute. Tick the devices the Dial should work with. New devices are ticked automatically. When the current output is unticked, the Dial does nothing and the menu bar icon dims. Devices that were connected before stay in the list while they are away, so you can set them up in advance. Devices without volume control can only be muted; devices with neither volume nor mute cannot be selected.
+**Devices** lists every audio output with its connection type and whether it supports volume control and mute. Tick the devices the Dial should work with. New devices are ticked automatically. When the current output is unticked, the Dial does nothing and the menu bar icon dims. Devices that were connected before stay in the list while they are away, so you can set them up in advance. Devices without volume control can only be muted, unless you turn on Software Volume for them. When the Dial cannot change anything on the current output, turning it gives a short buzz.
+
+### Software volume
+
+Some audio interfaces, such as the MOTU M2, and many HDMI outputs have no volume control that macOS can reach. Tick **Software Volume** for such a device in the Devices tab, and Manopola adjusts the level of the audio sent to it instead.
+
+- macOS asks once for permission to record system audio. Manopola only scales the audio on its way to the device; nothing is stored or sent anywhere.
+- It adds a few milliseconds of latency, also for music software such as Logic Pro playing to that device.
+- If Manopola quits, the device plays at full level again, so keep its hardware knob at a safe setting.
+- The keyboard volume keys still cannot change these devices; the Dial and the menu can.
 
 ### Troubleshooting
 

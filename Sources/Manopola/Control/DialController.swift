@@ -68,7 +68,10 @@ final class DialController {
             gesture = .pressedTurned
         }
         let settings = settings()
-        guard detents != 0, let state = audio.state, state.canSetVolume, !settings.excludedDeviceUIDs.contains(state.deviceUID) else {
+        guard detents != 0, let state = audio.state, !settings.excludedDeviceUIDs.contains(state.deviceUID) else { return }
+        // The device has no volume control and no software volume: buzz so the user knows nothing will change.
+        guard state.canSetVolume else {
+            hitEndStop()
             return
         }
 
