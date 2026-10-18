@@ -4,6 +4,8 @@ import Foundation
 struct ControlSettings: Equatable {
     var stepPercent: Int
     var reverseDirection: Bool
+    /// Output devices the Dial must leave alone, by Core Audio UID.
+    var excludedDeviceUIDs: Set<String> = []
 }
 
 /// Typed wrapper around `UserDefaults` (docs/DESIGN.md §7.7). Out-of-range stored values fall back to the default.
@@ -17,6 +19,8 @@ final class Settings {
         static let reverseDirection = "reverseDirection"
         static let hapticDetents = "hapticDetents"
         static let showOverlay = "showOverlay"
+        static let excludedOutputDevices = "excludedOutputDevices"
+        static let knownOutputDevices = "knownOutputDevices"
     }
 
     private static let defaultDetents = 36
@@ -64,7 +68,44 @@ final class Settings {
     }
 
     var controlSettings: ControlSettings {
-        ControlSettings(stepPercent: volumeStepPercent, reverseDirection: reverseDirection)
+        ControlSettings(stepPercent: volumeStepPercent, reverseDirection: reverseDirection, excludedDeviceUIDs: excludedDeviceUIDs)
+    }
+
+    // MARK: - Output Devices
+
+    /// Stored as exclusions, so devices the app has never seen are enabled and it works out of the box.
+    var excludedDeviceUIDs: Set<String> {
+        get { Set(defaults.stringArray(forKey: Key.excludedOutputDevices) ?? []) }
+        set { write(newValue.sorted(), forKey: Key.excludedOutputDevices) }
+    }
+
+    func isDeviceEnabled(_ uid: String) -> Bool {
+        !excludedDeviceUIDs.contains(uid)
+    }
+
+    func setDevice(_ uid: String, enabled: Bool) {
+        var excluded = excludedDeviceUIDs
+        if enabled {
+            excluded.remove(uid)
+        }
+        else {
+            excluded.insert(uid)
+        }
+        guard excluded != excludedDeviceUIDs else { return }
+        excludedDeviceUIDs = excluded
+    }
+
+    /// Names of every output device seen so far, by UID, so absent devices can still be listed and configured.
+    var knownDevices: [String: String] {
+        defaults.dictionary(forKey: Key.knownOutputDevices) as? [String: String] ?? [:]
+    }
+
+    /// Writes, and so calls `onChange`, only when a device or name is new.
+    func rememberDevices(_ names: [String: String]) {
+        let known = knownDevices
+        let merged = known.merging(names) { _, new in new }
+        guard merged != known else { return }
+        write(merged, forKey: Key.knownOutputDevices)
     }
 
     private func write(_ value: Any, forKey key: String) {

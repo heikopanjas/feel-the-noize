@@ -1,13 +1,26 @@
 import AppKit
 
-/// Non-resizable preferences window, centered on first show (docs/DESIGN.md §7.6).
+/// Non-resizable settings window with General and Devices tabs, centered on first show (docs/DESIGN.md §7.6).
 final class SettingsWindowController: NSWindowController {
     private var hasBeenShown = false
 
     init(settings: Settings) {
-        let window = NSWindow(contentViewController: SettingsViewController(settings: settings))
+        let tabs = NSTabViewController()
+        tabs.tabStyle = .toolbar
+        for (viewController, symbol) in [
+            (GeneralSettingsViewController(settings: settings) as NSViewController, "gearshape"),
+            (DeviceSettingsViewController(settings: settings), "hifispeaker.2")
+        ] {
+            let item = NSTabViewItem(viewController: viewController)
+            item.label = viewController.title ?? ""
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
+            tabs.addTabViewItem(item)
+        }
+
+        // The window title follows the selected tab, as in macOS Settings.
+        let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
-        window.title = "Manopola Settings"
+        window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         super.init(window: window)
     }

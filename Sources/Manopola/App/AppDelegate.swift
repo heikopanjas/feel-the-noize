@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         settings.onChange = { [weak self] in
             self?.applyDialConfiguration()
+            // Excluding or including the current output changes the icon.
+            self?.refreshStatusItem()
         }
         // Stored before start(), so the first match already gets the user's configuration.
         applyDialConfiguration()
@@ -61,6 +63,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         audio.onChange = { [weak self] state in
             Log.audio.info("Audio state: \(String(describing: state), privacy: .public)")
+            if let state {
+                // Remembered here too, so the Devices tab lists outputs seen while it was closed.
+                self?.settings.rememberDevices([state.deviceUID: state.deviceName])
+            }
             self?.refreshStatusItem()
         }
         controller.onAdjusted = { [weak self] state in
@@ -92,7 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Wiring
 
     private func refreshStatusItem() {
-        statusItem?.update(audio: audio.state, dial: dial.connection)
+        let isOutputEnabled = audio.state.map { settings.isDeviceEnabled($0.deviceUID) } ?? true
+        statusItem?.update(audio: audio.state, dial: dial.connection, isOutputEnabled: isOutputEnabled)
     }
 
     /// Menu changes go straight to the audio device: no haptics and no overlay, which belong to the Dial.

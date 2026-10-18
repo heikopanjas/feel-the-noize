@@ -67,9 +67,11 @@ final class DialController {
         if isFine {
             gesture = .pressedTurned
         }
-        guard detents != 0, let state = audio.state, state.canSetVolume else { return }
-
         let settings = settings()
+        guard detents != 0, let state = audio.state, state.canSetVolume, !settings.excludedDeviceUIDs.contains(state.deviceUID) else {
+            return
+        }
+
         let detents = settings.reverseDirection ? -detents : detents
         var step = Float32(settings.stepPercent) / 100
         if isFine {
@@ -96,7 +98,7 @@ final class DialController {
     }
 
     private func toggleMute() {
-        guard let state = audio.state else { return }
+        guard let state = audio.state, !settings().excludedDeviceUIDs.contains(state.deviceUID) else { return }
         let muted = !state.isMuted
         audio.setMuted(muted)
         // A device with neither mute nor software volume refuses; then there is nothing to confirm.

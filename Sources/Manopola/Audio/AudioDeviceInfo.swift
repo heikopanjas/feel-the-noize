@@ -1,0 +1,58 @@
+import CoreAudio
+
+/// An output device as listed in the Devices settings tab (docs/DESIGN.md §7.6).
+struct AudioDeviceInfo: Equatable {
+    enum Transport: Equatable {
+        case builtIn
+        case bluetooth
+        case usb
+        case hdmi
+        case displayPort
+        case airPlay
+        case thunderbolt
+        case virtual
+        case aggregate
+        case other
+
+        init(coreAudioTransportType: UInt32) {
+            switch coreAudioTransportType {
+                case kAudioDeviceTransportTypeBuiltIn: self = .builtIn
+                case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: self = .bluetooth
+                case kAudioDeviceTransportTypeUSB: self = .usb
+                case kAudioDeviceTransportTypeHDMI: self = .hdmi
+                case kAudioDeviceTransportTypeDisplayPort: self = .displayPort
+                case kAudioDeviceTransportTypeAirPlay: self = .airPlay
+                case kAudioDeviceTransportTypeThunderbolt: self = .thunderbolt
+                case kAudioDeviceTransportTypeVirtual: self = .virtual
+                case kAudioDeviceTransportTypeAggregate, kAudioDeviceTransportTypeAutoAggregate: self = .aggregate
+                default: self = .other
+            }
+        }
+
+        var label: String {
+            switch self {
+                case .builtIn: "Built-in"
+                case .bluetooth: "Bluetooth"
+                case .usb: "USB"
+                case .hdmi: "HDMI"
+                case .displayPort: "DisplayPort"
+                case .airPlay: "AirPlay"
+                case .thunderbolt: "Thunderbolt"
+                case .virtual: "Virtual"
+                case .aggregate: "Aggregate"
+                case .other: "Other"
+            }
+        }
+    }
+
+    let uid: String
+    let name: String
+    let transport: Transport
+    let canSetVolume: Bool
+    let hasHardwareMute: Bool
+
+    /// Without volume the Dial can still mute through a hardware mute control; without either it can do nothing.
+    var isControllable: Bool {
+        canSetVolume || hasHardwareMute
+    }
+}

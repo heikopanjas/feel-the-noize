@@ -73,9 +73,13 @@ struct DialControllerTests {
         private let recorder = AdjustmentRecorder()
 
         init(audio: FakeAudio = FakeAudio(), settings: ControlSettings = ControlSettings(stepPercent: 2, reverseDirection: false)) {
+            self.init(audio: audio, settingsProvider: { settings })
+        }
+
+        init(audio: FakeAudio = FakeAudio(), settingsProvider: @escaping () -> ControlSettings) {
             self.audio = audio
             let clock = clock
-            controller = DialController(audio: audio, haptics: haptics, settings: { settings }, now: { clock.now })
+            controller = DialController(audio: audio, haptics: haptics, settings: settingsProvider, now: { clock.now })
             let recorder = recorder
             controller.onAdjusted = { recorder.states.append($0) }
         }
@@ -230,6 +234,54 @@ struct DialControllerTests {
         fixture.controller.handle(.released)
         #expect(fixture.audio.state?.isMuted == false)
         #expect(abs(fixture.volume() - 0.40) < Self.tolerance)
+    }
+
+    // MARK: - Excluded Devices
+
+    private static let excludingFake = ControlSettings(stepPercent: 2, reverseDirection: false, excludedDeviceUIDs: ["fake"])
+
+    @Test func excludedDeviceIgnoresRotation() {
+        let fixture = Fixture(settings: Self.excludingFake)
+        fixture.controller.handle(.rotated(detents: 1))
+        #expect(fixture.audio.volumeWrites.isEmpty)
+        #expect(fixture.adjustments.isEmpty)
+    }
+
+    @Test func excludedDeviceIgnoresPress() {
+        let fixture = Fixture(settings: Self.excludingFake)
+        fixture.controller.handle(.pressed)
+        fixture.controller.handle(.released)
+        #expect(fixture.audio.muteWrites.isEmpty)
+        #expect(fixture.haptics.muteToggles.isEmpty)
+        #expect(fixture.adjustments.isEmpty)
+    }
+
+    @Test func excludedDeviceAtTheEndDoesNotBuzz() {
+        let fixture = Fixture(audio: FakeAudio(volume: 1), settings: Self.excludingFake)
+        fixture.controller.handle(.rotated(detents: 1))
+        #expect(fixture.haptics.endStops == 0)
+    }
+
+    @Test func pressAndTurnOnExcludedDeviceStillSuppressesMuteToggle() {
+        let audio = FakeAudio()
+        var excluded = true
+        let fixture = Fixture(
+            audio: audio,
+            settingsProvider: {
+                ControlSettings(stepPercent: 2, reverseDirection: false, excludedDeviceUIDs: excluded ? ["fake"] : [])
+            })
+        fixture.controller.handle(.pressed)
+        fixture.controller.handle(.rotated(detents: 1))
+        // Re-included before the release: the turn still counts, so the release must not mute.
+        excluded = false
+        fixture.controller.handle(.released)
+        #expect(fixture.audio.muteWrites.isEmpty)
+    }
+
+    @Test func otherDevicesAreUnaffectedByExclusions() {
+        let fixture = Fixture(settings: ControlSettings(stepPercent: 2, reverseDirection: false, excludedDeviceUIDs: ["speakers"]))
+        fixture.controller.handle(.rotated(detents: 1))
+        #expect(abs(fixture.volume() - 0.42) < Self.tolerance)
     }
 
     // MARK: - End Stop

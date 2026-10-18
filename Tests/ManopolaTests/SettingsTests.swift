@@ -50,6 +50,44 @@ struct SettingsTests {
         }
     }
 
+    @Test func everyDeviceIsEnabledUntilExcluded() {
+        withSettings { settings, _ in
+            #expect(settings.excludedDeviceUIDs.isEmpty)
+            #expect(settings.isDeviceEnabled("speakers"))
+            settings.setDevice("speakers", enabled: false)
+            #expect(!settings.isDeviceEnabled("speakers"))
+            #expect(settings.isDeviceEnabled("airpods"))
+            #expect(settings.controlSettings.excludedDeviceUIDs == ["speakers"])
+            settings.setDevice("speakers", enabled: true)
+            #expect(settings.excludedDeviceUIDs.isEmpty)
+        }
+    }
+
+    @Test func settingADeviceToItsCurrentStateDoesNotWrite() {
+        withSettings { settings, _ in
+            var changes = 0
+            settings.onChange = { changes += 1 }
+            settings.setDevice("speakers", enabled: true)
+            #expect(changes == 0)
+        }
+    }
+
+    @Test func rememberDevicesMergesAndWritesOnlyWhatIsNew() {
+        withSettings { settings, _ in
+            var changes = 0
+            settings.onChange = { changes += 1 }
+            settings.rememberDevices(["speakers": "MacBook Pro Speakers"])
+            settings.rememberDevices(["airpods": "AirPods Pro"])
+            settings.rememberDevices(["speakers": "MacBook Pro Speakers"])
+            #expect(settings.knownDevices == ["speakers": "MacBook Pro Speakers", "airpods": "AirPods Pro"])
+            #expect(changes == 2)
+
+            settings.rememberDevices(["airpods": "Heiko's AirPods"])
+            #expect(settings.knownDevices["airpods"] == "Heiko's AirPods")
+            #expect(changes == 3)
+        }
+    }
+
     @Test func everyWriteCallsOnChange() {
         withSettings { settings, _ in
             var changes = 0

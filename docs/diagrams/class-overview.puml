@@ -67,6 +67,27 @@ package "Control" {
 }
 
 package "Audio" {
+    class AudioDeviceList {
+        + devices : [AudioDeviceInfo]
+        + defaultDeviceUID : String?
+        + onChange : () -> Void
+        + start()
+        + stop()
+    }
+    class AudioDeviceInfo <<struct>> {
+        + uid : String
+        + name : String
+        + transport : Transport
+        + canSetVolume : Bool
+        + hasHardwareMute : Bool
+        + isControllable : Bool
+    }
+    class CoreAudioProperty <<enum>> {
+        + {static} readDeviceIDs() : [AudioObjectID]
+        + {static} readDefaultOutputDevice() : AudioObjectID?
+        + {static} readVolume / writeVolume
+        + {static} readMute / writeMute
+    }
     class AudioOutput {
         + onChange : (AudioState?) -> Void
         + start()
@@ -88,7 +109,7 @@ package "UI" {
         + onToggleMute : () -> Void
         + onOpenSettings : () -> Void
         + onMenuWillOpen : () -> Void
-        + update(audio : AudioState?, dial : DialConnection)
+        + update(audio : AudioState?, dial : DialConnection, isOutputEnabled : Bool)
         + setAccessDenied(isDenied : Bool)
     }
     class VolumePresentation <<enum>> {
@@ -99,7 +120,8 @@ package "UI" {
         + show(audio : AudioState)
     }
     class SettingsWindowController
-    class SettingsViewController
+    class GeneralSettingsViewController
+    class DeviceSettingsViewController
 }
 
 package "Support" {
@@ -109,7 +131,11 @@ package "Support" {
         + reverseDirection : Bool
         + hapticDetents : Bool
         + showOverlay : Bool
+        + excludedDeviceUIDs : Set<String>
+        + knownDevices : [String: String]
         + onChange : () -> Void
+        + setDevice(uid : String, enabled : Bool)
+        + rememberDevices(names : [String: String])
     }
     class LoginItem <<enum>> {
         + {static} isEnabled : Bool
@@ -140,8 +166,14 @@ DialController ..> Settings : reads
 StatusItemController ..> VolumePresentation : uses
 VolumeOverlay ..> VolumePresentation : uses
 AppDelegate *-- SettingsWindowController
-SettingsWindowController *-- SettingsViewController
-SettingsViewController ..> Settings : edits
-SettingsViewController ..> LoginItem : toggles
+SettingsWindowController *-- GeneralSettingsViewController
+SettingsWindowController *-- DeviceSettingsViewController
+GeneralSettingsViewController ..> Settings : edits
+GeneralSettingsViewController ..> LoginItem : toggles
+DeviceSettingsViewController *-- AudioDeviceList
+DeviceSettingsViewController ..> Settings : selects devices
+AudioDeviceList ..> AudioDeviceInfo : lists
+AudioOutput ..> CoreAudioProperty : uses
+AudioDeviceList ..> CoreAudioProperty : uses
 
 @enduml

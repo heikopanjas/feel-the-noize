@@ -19,16 +19,19 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let muteItem = NSMenuItem(title: "Mute", action: #selector(toggleMute(_:)), keyEquivalent: "")
     private var audio: AudioState?
     private var dial = DialConnection.notConnected
+    private var isOutputEnabled = true
 
     override init() {
         super.init()
         buildMenu()
-        update(audio: nil, dial: .notConnected)
+        update(audio: nil, dial: .notConnected, isOutputEnabled: true)
     }
 
-    func update(audio: AudioState?, dial: DialConnection) {
+    /// `isOutputEnabled` is false when the user excluded the current output in the Devices settings.
+    func update(audio: AudioState?, dial: DialConnection, isOutputEnabled: Bool) {
         self.audio = audio
         self.dial = dial
+        self.isOutputEnabled = isOutputEnabled
         // Updated here too, so a retry started by opening the menu shows its result while the menu is open.
         dialItem.title = Self.title(for: dial)
 
@@ -39,8 +42,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             case .notConnected: description += ", Surface Dial not connected"
             case .inUseElsewhere: description += ", Surface Dial in use by another app"
         }
+        if !isOutputEnabled {
+            description += ", Dial off for this output"
+        }
         button.image = VolumePresentation.image(for: audio, accessibilityDescription: description)
-        button.appearsDisabled = dial != .connected || audio?.canSetVolume != true
+        button.appearsDisabled = dial != .connected || audio?.canSetVolume != true || !isOutputEnabled
     }
 
     func setAccessDenied(_ isDenied: Bool) {
@@ -82,7 +88,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         dialItem.title = Self.title(for: dial)
-        outputItem.title = "Output: \(audio?.deviceName ?? "None")"
+        let suffix = audio != nil && !isOutputEnabled ? " (Dial off)" : ""
+        outputItem.title = "Output: \(audio?.deviceName ?? "None")\(suffix)"
 
         switch audio {
             case .none:

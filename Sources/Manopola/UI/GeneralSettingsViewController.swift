@@ -1,7 +1,7 @@
 import AppKit
 
-/// The settings grid from docs/DESIGN.md §7.6. Every change applies immediately.
-final class SettingsViewController: NSViewController {
+/// The General settings tab from docs/DESIGN.md §7.6. Every change applies immediately.
+final class GeneralSettingsViewController: NSViewController {
     private static let margin: CGFloat = 20
 
     private let settings: Settings
@@ -18,6 +18,7 @@ final class SettingsViewController: NSViewController {
     init(settings: Settings) {
         self.settings = settings
         super.init(nibName: nil, bundle: nil)
+        title = "General"
     }
 
     required init?(coder: NSCoder) {
@@ -102,6 +103,9 @@ final class SettingsViewController: NSViewController {
         overlayCheckbox.state = settings.showOverlay ? .on : .off
         loginCheckbox.state = LoginItem.isEnabled ? .on : .off
         approvalRow?.isHidden = LoginItem.status != .requiresApproval
+        // The tab view sizes the window from this; without it the grid is stretched to a default size.
+        view.layoutSubtreeIfNeeded()
+        preferredContentSize = view.fittingSize
     }
 
     private static func label(_ text: String) -> NSTextField {

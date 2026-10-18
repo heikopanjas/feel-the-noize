@@ -84,6 +84,7 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-10 | Optional on-screen overlay for Dial-initiated changes. |
 | FR-11 | Settings window for all options in §7.7. |
 | FR-12 | Launch at login. |
+| FR-13 | A Devices settings tab lists every output device with its connection type and whether it supports volume control and mute; the user selects which devices the Dial works with. New devices are selected by default. On an unselected default output, turning and pressing do nothing. |
 
 ### Non-Functional
 
@@ -122,12 +123,13 @@ The icon is an SF Symbol rendered as a template image:
 | Output device without software volume | `speaker.fill`, button `appearsDisabled = true` |
 | No output device | `speaker.fill`, button `appearsDisabled = true` |
 | Dial not connected, or in use by another app | current symbol, button `appearsDisabled = true` |
+| Current output unselected in the Devices tab | current symbol, button `appearsDisabled = true`, accessibility text adds ", Dial off for this output" |
 
 ### 5.3 Menu
 
 ```
 Surface Dial: Connected            (disabled info item; or Not Connected, or In Use by Another App)
-Output: MacBook Pro Speakers       (disabled info item)
+Output: MacBook Pro Speakers       (disabled info item; "(Dial off)" appended when unselected)
 Volume: 42 %                       (disabled info item)
 ─────────────
 Mute                         ✓     (toggles mute; state reflects mute)
@@ -355,9 +357,9 @@ final class DialController {
 
 **Gesture state:** `idle`, `pressedStill`, `pressedTurned` (see diagram). Rules:
 
-1. `rotated(n)`: if `reverseDirection`, `n = -n`. Step size is `stepPercent / 100`, or a quarter of it while pressed. If there is no state or `canSetVolume == false`, do nothing. If muted, call `setMuted(false)` first. Compute the new volume with `VolumeStepper`. If it equals the current volume and the current volume is at 0 or 1 in the direction of travel, call `haptics.endStop()`, debounced with `now`: the buzz plays only if the previous end-stop detent is at least 300 ms old, so a continuous spin past the end buzzes once (checklist item 5). Otherwise `setVolume`. The step is computed from the state after unmuting, because unmuting an emulated mute restores the remembered volume. Then call `onAdjusted(audio.state)`. Rotating while pressed moves to `pressedTurned` even when the volume cannot change, so the release never toggles mute.
+1. `rotated(n)`: if `reverseDirection`, `n = -n`. Step size is `stepPercent / 100`, or a quarter of it while pressed. If there is no state, `canSetVolume == false`, or the device UID is in `excludedDeviceUIDs` (§7.6), do nothing. If muted, call `setMuted(false)` first. Compute the new volume with `VolumeStepper`. If it equals the current volume and the current volume is at 0 or 1 in the direction of travel, call `haptics.endStop()`, debounced with `now`: the buzz plays only if the previous end-stop detent is at least 300 ms old, so a continuous spin past the end buzzes once (checklist item 5). Otherwise `setVolume`. The step is computed from the state after unmuting, because unmuting an emulated mute restores the remembered volume. Then call `onAdjusted(audio.state)`. Rotating while pressed moves to `pressedTurned` even when the volume cannot change, so the release never toggles mute.
 2. `pressed` → `pressedStill`.
-3. `released` in `pressedStill` → toggle mute, `haptics.muteToggled(isMuted:)` with the new state, `onAdjusted`. In `pressedTurned` → only return to `idle`.
+3. `released` in `pressedStill` → if the device UID is in `excludedDeviceUIDs`, do nothing; otherwise toggle mute, `haptics.muteToggled(isMuted:)` with the new state, `onAdjusted`. In `pressedTurned` → only return to `idle`.
 4. `reset()` → `idle`.
 5. A mute toggle the device refuses (neither mute nor software volume) gives no haptic confirmation and no `onAdjusted`.
 
@@ -413,6 +415,10 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 **Writes** update the cached state immediately (optimistic) so `DialController` and the overlay see the new value without waiting for the listener round-trip; the listener then confirms or corrects it. Core Audio reads a written volume back with float noise (0.58 as 0.58000004); a re-read that differs from the cached volume of the same device by less than 0.0001 keeps the cached value, so it does not fire `onChange` a second time.
 
+**Shared property access.** The Core Audio property helpers live in `CoreAudioProperty` (caseless enum): default output device, device list, output stream presence, hidden flag, transport type, UID and name strings, settability, volume and mute read and write, and the shared `ListenerBlock` type. `AudioOutput` and `AudioDeviceList` both use it.
+
+**Device list.** `AudioDeviceList` lists the visible devices that have output streams as `AudioDeviceInfo` (UID, name, transport, `canSetVolume`, `hasHardwareMute`, computed `isControllable`) plus the default output UID. It listens to `kAudioHardwarePropertyDevices` and the default output device on the system object and reloads on any change. Only the Devices tab owns one, started in `viewWillAppear()` and stopped in `viewDidDisappear()`, so no listener stays registered while the tab is closed.
+
 **Errors.** `CoreAudioError` and `OSStatus.throwIfError(_:)` are ported from Push to Hush (`CoreAudioSource.swift`), with the four-character-code rendering corrected to most-significant byte first. Failures are logged under the `audio` category; the cached state stays at the last confirmed value.
 
 ### 7.5 StatusItemController and VolumeOverlay
@@ -424,7 +430,9 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 ### 7.6 SettingsWindowController
 
-Programmatic `NSWindowController` + `NSViewController` with an `NSGridView`. Non-resizable, titled "Manopola Settings", centered on first show, standard close button. Shown with `NSApp.activate()` because the app is `LSUIElement`.
+Programmatic `NSWindowController` whose content is an `NSTabViewController` with `tabStyle = .toolbar` and `window.toolbarStyle = .preference`. Tabs: **General** (`gearshape`, `GeneralSettingsViewController`) and **Devices** (`hifispeaker.2`, `DeviceSettingsViewController`). Non-resizable; the window title follows the selected tab, as in macOS Settings, and the window takes each tab's `preferredContentSize`. Centered on first show, standard close button. Shown with `NSApp.activate()` because the app is `LSUIElement`.
+
+**General tab:** an `NSGridView`:
 
 | Label | Control | Values |
 |---|---|---|
@@ -435,7 +443,19 @@ Programmatic `NSWindowController` + `NSViewController` with an `NSGridView`. Non
 | Show volume overlay | `NSButton` (checkbox) | — |
 | Launch at login | `NSButton` (checkbox) | — |
 
-Changes apply immediately (no Apply button). When `LoginItem.status == .requiresApproval`, a small label and a button "Open Login Items…" (`SMAppService.openSystemSettingsLoginItems()`) appear below the checkbox. The checkbox shows on for both `.enabled` and `.requiresApproval`, since the app is registered in both cases. The view controller re-reads all values in `viewWillAppear()`, because launch at login can change in System Settings.
+Changes apply immediately (no Apply button). When `LoginItem.status == .requiresApproval`, a small label and a button "Open Login Items…" (`SMAppService.openSystemSettingsLoginItems()`) appear below the checkbox. The checkbox shows on for both `.enabled` and `.requiresApproval`, since the app is registered in both cases. The view controller re-reads all values in `viewWillAppear()`, because launch at login can change in System Settings, and sets `preferredContentSize` to its fitting size so the tab view does not stretch the grid.
+
+**Devices tab:** a view-based `NSTableView` (620 × 330 pt content, alternating rows, no selection) with a footnote "The Dial controls the current output only when it is ticked. Devices without volume control can only be muted."
+
+| Column | Content |
+|---|---|
+| Use | checkbox; off and disabled for a connected device with neither volume nor mute |
+| Device | name; `speaker.wave.2.fill` marks the current default output |
+| Connection | Built-in, Bluetooth, USB, HDMI, DisplayPort, AirPlay, Thunderbolt, Virtual, Aggregate, Other; "Not connected" for remembered devices |
+| Volume Control | Yes / No; – when not connected |
+| Mute | Yes (hardware), Emulated (volume only, §7.4), No; – when not connected |
+
+Connected devices come first, then remembered devices from `Settings.knownDevices` that are absent, each sorted by name; remembered rows use the secondary label color and stay toggleable. Each device-list change calls `Settings.rememberDevices`; `AppDelegate` also remembers every default output it sees, so devices used while the tab was closed are listed too. Toggling a checkbox calls `Settings.setDevice(_:enabled:)`, and `AppDelegate` refreshes the status item on every settings change.
 
 ### 7.7 Settings and Persistence
 
@@ -448,6 +468,8 @@ Changes apply immediately (no Apply button). When `LoginItem.status == .requires
 | `reverseDirection` | Bool | false | — |
 | `hapticDetents` | Bool | true | — |
 | `showOverlay` | Bool | true | — |
+| `excludedOutputDevices` | [String] | [] | Core Audio device UIDs the Dial leaves alone; stored as exclusions so new devices are enabled |
+| `knownOutputDevices` | [String: String] | [:] | UID to name of every output seen; written only when something is new |
 
 Out-of-range stored values fall back to the default. Launch at login is not stored; `SMAppService.mainApp.status` is the source of truth (`register()` / `unregister()` in `LoginItem`, a caseless enum).
 
@@ -497,6 +519,9 @@ Whether macOS requires Input Monitoring for opening a non-keyboard, non-pointer 
 | Two Dials connected | first matched device is used; others ignored and logged |
 | Dial held by another process (another Dial utility, a second Manopola) | state `.inUseElsewhere`, icon dimmed, menu says "In Use by Another App"; retried when the menu opens or the app becomes active (§7.2) |
 | Settings changed while disconnected | stored; applied on next match |
+| Default output is unselected in the Devices tab | turning and pressing do nothing, also no end-stop buzz; icon dimmed, menu shows "(Dial off)"; menu Mute still works |
+| Remembered device reconnects | its row moves back to the connected section with its selection unchanged |
+| Device with neither volume nor mute (e.g. MOTU M2) | checkbox disabled; as default output the Dial does nothing (existing "not adjustable" state) |
 
 ## 11. Testing
 
@@ -524,8 +549,9 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 |---|---|
 | `DialReportTests` | parsing both buffer shapes; clockwise `01 00 01 00 …` → +1; counter-clockwise `01 00 FF FF …` → −1; pressed `01 01 00 00 …`; wrong ID or length → `nil`; exact bytes of the feature report (36 detents, haptics on → `01 24 00 00 03 00 00 00`) and of the three manual patterns in §7.1 |
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
-| `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write; each test uses a private `UserDefaults` suite |
-| `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press |
+| `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite |
+| `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
+| `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle |
 
 `DialDevice`, `AudioOutput` and the UI are thin adapters over system frameworks and are covered by the manual checklist.
 
@@ -560,10 +586,11 @@ Manopola/
 │   ├── App/                       main.swift, AppDelegate.swift
 │   ├── Dial/                      DialDevice.swift, DialReport.swift, DialEvent.swift
 │   ├── Control/                   DialController.swift, VolumeStepper.swift
-│   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift
+│   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift,
+│   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
-│   │                              SettingsWindowController.swift, SettingsViewController.swift,
-│   │                              VolumePresentation.swift
+│   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
+│   │                              DeviceSettingsViewController.swift, VolumePresentation.swift
 │   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift
 │   └── Resources/                 Assets.xcassets
 └── Tests/ManopolaTests/           Swift Testing suites (from M2)
@@ -600,7 +627,7 @@ make notarize     # notarize, staple, Gatekeeper check
 |---|---|---|
 | R1 | Does the input report buffer on macOS include the report ID byte? | parser accepts both; M1 logs the actual shape and the doc is updated. **Answered 2026-10-18:** 9 bytes with the report ID first, in every report of a live debug capture (§7.1) |
 | R2 | Does seizing work for the Dial, and does any open mode require Input Monitoring? | M1 tests seize and shared mode on a clean user account; §9.2 is the fallback. **Partly answered 2026-10-18:** on the developer account the seized open succeeds and reports arrive without an Input Monitoring prompt, while `IOHIDCheckAccess` reports "unknown". The seize is exclusive: a second process gets `kIOReturnExclusiveAccess` (`0xe00002c5`) in seized and in shared mode, yet its matching callback still fires. Clean-account test still open |
-| R3 | Is the delta exactly ±1 per detent after setting the resolution multiplier? | M1 logs raw deltas at 18 and 72 detents; if not, `DialDevice` divides by `3600 / R` with an accumulator. **Confirmed for 36 detents 2026-10-18:** every Dial-driven volume change was exactly one 2 % step, and a debug capture shows only ±1 deltas, also on fast turns. 18 and 72 still to check |
+| R3 | Is the delta exactly ±1 per detent after setting the resolution multiplier? | M1 logs raw deltas at 18 and 72 detents; if not, `DialDevice` divides by `3600 / R` with an accumulator. **Confirmed for 36 detents 2026-10-18:** every Dial-driven volume change was exactly one 2 % step, and a debug capture shows only ±1 deltas, also on fast turns. **Confirmed for 18 and 72 detents 2026-10-18:** after each configuration report, every input report carried a delta of exactly ±1 (35 reports at 18, 126 at 72); the accumulator fallback is not needed |
 | R4 | Do manual trigger ordinal 4 (buzz) and repeat/retrigger work as specified? | M1 tries each pattern; fallback for end stop is click with repeat 2 at 40 ms. **Answered 2026-10-18:** all manual triggers are accepted. Click with repeat and retrigger works (mute double click felt). Buzz does not end on its own: ordinal 4 is Buzz Continuous and keeps vibrating until the next haptic, so the end stop needs the click fallback or an explicit Stop. **Decided and verified 2026-10-18:** short buzz, Stop trigger after 100 ms (§7.2). Stop (ordinal 2) works as a manual trigger; every buzz in a capture was followed by an accepted Stop about 135 ms later, and the buzz ends by itself |
 | R5 | Haptic configuration lost after Dial idle sleep | re-send policy in §7.2 |
 | R6 | Hardware is discontinued | buy a second used unit as a spare once M3 works |

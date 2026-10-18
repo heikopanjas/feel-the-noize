@@ -37,6 +37,10 @@ The menu bar icon shows the volume level and mute state. It is dimmed while the 
 
 ### Settings
 
+Settings has two tabs.
+
+**General**
+
 | Setting | Values | Default |
 |---|---|---|
 | Detents per turn | 18, 24, 36, 48, 72 | 36 |
@@ -45,6 +49,8 @@ The menu bar icon shows the volume level and mute state. It is dimmed while the 
 | Haptic detents | on or off | on |
 | Show volume overlay | on or off | on |
 | Launch at login | on or off | off |
+
+**Devices** lists every audio output with its connection type and whether it supports volume control and mute. Tick the devices the Dial should work with. New devices are ticked automatically. When the current output is unticked, the Dial does nothing and the menu bar icon dims. Devices that were connected before stay in the list while they are away, so you can set them up in advance. Devices without volume control can only be muted; devices with neither volume nor mute cannot be selected.
 
 ### Troubleshooting
 
