@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let dial: DialDevice
     private let controller: DialController
     private let overlay = VolumeOverlay()
+    private let battery = DialBattery()
     private var statusItem: StatusItemController?
     private var settingsWindow: SettingsWindowController?
     private var isAccessDenied = false
@@ -40,7 +41,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItem = statusItem
 
         audio.preferences = settings
+        applyIconStyle()
         settings.onChange = { [weak self] in
+            self?.applyIconStyle()
             self?.applyDialConfiguration()
             self?.audio.refreshSoftwareVolume()
             // Excluding or including the current output changes the icon.
@@ -59,7 +62,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.controller.reset()
             }
             self?.confirmReconnection(connection)
+            if connection == .connected {
+                self?.battery.dialConnected()
+            }
+            else {
+                self?.battery.dialDisconnected()
+            }
             self?.refreshStatusItem()
+        }
+        battery.onChange = { [weak self] level in
+            self?.statusItem?.setDialBatteryLevel(level)
         }
         dial.onAccessDenied = { [weak self] in
             self?.isAccessDenied = true
@@ -144,6 +156,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dial.playHaptic(.click)
         }
         hasDialConnectedBefore = true
+    }
+
+    private func applyIconStyle() {
+        statusItem?.iconStyle = settings.iconStyle
+        overlay.iconStyle = settings.iconStyle
     }
 
     private func applyDialConfiguration() {

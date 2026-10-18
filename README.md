@@ -33,7 +33,7 @@ Manopola lives in the menu bar only; it has no Dock icon. Turn on "Launch at log
 
 Manopola always controls the current default output device and follows it when it changes, for example when AirPods connect. Volume and mute changes made with the keyboard or Control Center show up in the menu bar icon right away.
 
-The menu bar icon shows the volume level and mute state. It is dimmed while the Dial is not connected or the output device has no software volume control, as with many HDMI and DisplayPort outputs.
+The menu bar icon is a knob, so it is easy to tell apart from the system's speaker icon; its pointer shows the volume level, and a slash shows mute. Choose its style, Arc, Ring or Dots, in Settings. Its menu also shows whether the Dial is connected and its battery level, which macOS asks permission to read over Bluetooth the first time. It is dimmed while the Dial is not connected or the output device has no software volume control, as with many HDMI and DisplayPort outputs.
 
 ### Settings
 
@@ -45,6 +45,7 @@ Settings has two tabs.
 |---|---|---|
 | Detents per turn | 18, 24, 36, 48, 72 | 36 |
 | Volume step | 1 %, 2 %, 3 %, 5 % | 2 % |
+| Icon style | Arc, Ring, Dots | Arc |
 | Reverse direction | on or off | off |
 | Haptic detents | on or off | on |
 | Show volume overlay | on or off | on |

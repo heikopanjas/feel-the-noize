@@ -1,24 +1,19 @@
 import AppKit
 
-/// Symbol and text for a volume state, shared by the menu bar icon and the overlay (docs/DESIGN.md §5.2).
+/// Images and text for a volume state, shared by the menu bar icon and the overlay (docs/DESIGN.md §5.2).
 enum VolumePresentation {
-    static func image(for state: AudioState?, accessibilityDescription: String) -> NSImage? {
-        let image: NSImage?
-        switch state {
-            case .some(let state) where state.isMuted:
-                image = NSImage(systemSymbolName: "speaker.slash.fill", accessibilityDescription: accessibilityDescription)
-            case .some(let state) where state.canSetVolume && state.volume <= 0:
-                image = NSImage(systemSymbolName: "speaker.slash.fill", accessibilityDescription: accessibilityDescription)
-            case .some(let state) where state.canSetVolume:
-                image = NSImage(
-                    systemSymbolName: "speaker.wave.3.fill", variableValue: Double(state.volume),
-                    accessibilityDescription: accessibilityDescription)
-            default:
-                // No output device, or one without software volume.
-                image = NSImage(systemSymbolName: "speaker.fill", accessibilityDescription: accessibilityDescription)
+    /// The knob for the menu bar and the overlay. A device without volume control plays at its fixed full level, so the
+    /// knob shows full; without any output device it shows the minimum. The caller dims it where nothing can change.
+    static func knobImage(for state: AudioState?, style: KnobIcon.Style, size: CGFloat, accessibilityDescription: String) -> NSImage {
+        let level: Float32
+        if let state {
+            level = state.canSetVolume ? state.volume : 1
         }
-        image?.isTemplate = true
-        return image
+        else {
+            level = 0
+        }
+        return KnobIcon.image(
+            style: style, level: level, isMuted: state?.isMuted ?? false, size: size, accessibilityDescription: accessibilityDescription)
     }
 
     static func percent(_ volume: Float32) -> String {

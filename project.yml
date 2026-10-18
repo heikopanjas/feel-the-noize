@@ -29,6 +29,7 @@ targets:
       path: Configuration/Manopola-Info.plist
       properties:
         NSAudioCaptureUsageDescription: Manopola changes the volume of audio devices without volume control by adjusting the audio sent to them.
+        NSBluetoothAlwaysUsageDescription: Manopola reads the battery level of your Surface Dial over Bluetooth.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.panjas.Manopola

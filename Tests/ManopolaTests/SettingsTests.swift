@@ -113,6 +113,16 @@ struct SettingsTests {
         }
     }
 
+    @Test func iconStyleDefaultsToArcAndFallsBack() {
+        withSettings { settings, defaults in
+            #expect(settings.iconStyle == .arc)
+            settings.iconStyle = .dots
+            #expect(settings.iconStyle == .dots)
+            defaults.set("speaker", forKey: "iconStyle")
+            #expect(settings.iconStyle == .arc)
+        }
+    }
+
     @Test func everyWriteCallsOnChange() {
         withSettings { settings, _ in
             var changes = 0

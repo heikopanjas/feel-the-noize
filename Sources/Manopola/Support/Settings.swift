@@ -19,6 +19,7 @@ final class Settings {
         static let reverseDirection = "reverseDirection"
         static let hapticDetents = "hapticDetents"
         static let showOverlay = "showOverlay"
+        static let iconStyle = "iconStyle"
         static let excludedOutputDevices = "excludedOutputDevices"
         static let knownOutputDevices = "knownOutputDevices"
         static let softwareVolumeDevices = "softwareVolumeDevices"
@@ -40,7 +41,8 @@ final class Settings {
             Key.volumeStepPercent: Self.defaultStepPercent,
             Key.reverseDirection: false,
             Key.hapticDetents: true,
-            Key.showOverlay: true
+            Key.showOverlay: true,
+            Key.iconStyle: KnobIcon.Style.arc.rawValue
         ])
     }
 
@@ -67,6 +69,12 @@ final class Settings {
     var showOverlay: Bool {
         get { defaults.bool(forKey: Key.showOverlay) }
         set { write(newValue, forKey: Key.showOverlay) }
+    }
+
+    /// The knob drawn in the menu bar and the overlay; unknown stored values fall back to the arc.
+    var iconStyle: KnobIcon.Style {
+        get { defaults.string(forKey: Key.iconStyle).flatMap(KnobIcon.Style.init(rawValue:)) ?? .arc }
+        set { write(newValue.rawValue, forKey: Key.iconStyle) }
     }
 
     var controlSettings: ControlSettings {

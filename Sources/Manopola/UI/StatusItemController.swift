@@ -10,6 +10,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     var onOpenSettings: (() -> Void)?
     /// Lets the owner retry a Dial held by another process while the user looks at the menu.
     var onMenuWillOpen: (() -> Void)?
+    var iconStyle = KnobIcon.Style.arc {
+        didSet { update(audio: audio, dial: dial, isOutputEnabled: isOutputEnabled) }
+    }
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let dialItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -20,6 +23,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var audio: AudioState?
     private var dial = DialConnection.notConnected
     private var isOutputEnabled = true
+    private var dialBatteryLevel: Int?
+    /// The status lines at the top are information, not commands, so they use a smaller font than the menu items.
+    private static let iconSize: CGFloat = 18
+    private static let infoAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
+        .foregroundColor: NSColor.secondaryLabelColor
+    ]
 
     override init() {
         super.init()
@@ -33,7 +43,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         self.dial = dial
         self.isOutputEnabled = isOutputEnabled
         // Updated here too, so a retry started by opening the menu shows its result while the menu is open.
-        dialItem.title = Self.title(for: dial)
+        Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: dialBatteryLevel))
 
         guard let button = statusItem.button else { return }
         var description = VolumePresentation.accessibilityDescription(for: audio)
@@ -45,8 +55,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if !isOutputEnabled {
             description += ", Dial off for this output"
         }
-        button.image = VolumePresentation.image(for: audio, accessibilityDescription: description)
+        button.image = VolumePresentation.knobImage(for: audio, style: iconStyle, size: Self.iconSize, accessibilityDescription: description)
         button.appearsDisabled = dial != .connected || audio?.canSetVolume != true || !isOutputEnabled
+    }
+
+    /// `nil` while the level is unknown, for example right after the Dial connected.
+    func setDialBatteryLevel(_ level: Int?) {
+        dialBatteryLevel = level
+        Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: level))
     }
 
     func setAccessDenied(_ isDenied: Bool) {
@@ -87,30 +103,36 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        dialItem.title = Self.title(for: dial)
+        Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: dialBatteryLevel))
         let suffix = audio != nil && !isOutputEnabled ? " (Dial off)" : ""
-        outputItem.title = "Output: \(audio?.deviceName ?? "None")\(suffix)"
+        Self.setInfoTitle(outputItem, "Output: \(audio?.deviceName ?? "None")\(suffix)")
 
         switch audio {
             case .none:
-                volumeItem.title = "Volume: –"
+                Self.setInfoTitle(volumeItem, "Volume: –")
             case .some(let state) where !state.canSetVolume:
-                volumeItem.title = "Volume: not adjustable"
+                Self.setInfoTitle(volumeItem, "Volume: not adjustable")
             case .some(let state):
                 let suffix = state.isSoftwareVolume ? " (software)" : ""
-                volumeItem.title = "Volume: \(VolumePresentation.percent(state.volume))\(suffix)"
+                Self.setInfoTitle(volumeItem, "Volume: \(VolumePresentation.percent(state.volume))\(suffix)")
         }
 
         muteItem.state = audio?.isMuted == true ? .on : .off
         muteItem.isEnabled = audio.map { $0.hasHardwareMute || $0.canSetVolume } ?? false
     }
 
-    private static func title(for dial: DialConnection) -> String {
-        switch dial {
-            case .connected: "Surface Dial: Connected"
-            case .notConnected: "Surface Dial: Not Connected"
-            case .inUseElsewhere: "Surface Dial: In Use by Another App"
+    static func title(for dial: DialConnection, batteryLevel: Int?) -> String {
+        switch (dial, batteryLevel) {
+            case (.connected, .some(let level)): "Surface Dial: Connected, battery \(level) %"
+            case (.connected, .none): "Surface Dial: Connected"
+            case (.notConnected, _): "Surface Dial: Not Connected"
+            case (.inUseElsewhere, _): "Surface Dial: In Use by Another App"
         }
+    }
+
+    /// Always through the attributed title: setting `title` alone would leave a stale attributed title on screen.
+    private static func setInfoTitle(_ item: NSMenuItem, _ text: String) {
+        item.attributedTitle = NSAttributedString(string: text, attributes: infoAttributes)
     }
 
     // MARK: - Actions

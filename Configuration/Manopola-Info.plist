@@ -20,5 +20,7 @@
 	<string>1</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Manopola changes the volume of audio devices without volume control by adjusting the audio sent to them.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Manopola reads the battery level of your Surface Dial over Bluetooth.</string>
 </dict>
 </plist>

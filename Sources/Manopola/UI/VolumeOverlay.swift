@@ -18,10 +18,13 @@ final class VolumeOverlay {
     private var hideTask: Task<Void, Never>?
     // Lets a fade that finishes after a new show() leave the panel on screen.
     private var showGeneration = 0
+    private static let knobSize: CGFloat = 72
+
+    var iconStyle = KnobIcon.Style.arc
 
     func show(_ state: AudioState) {
-        imageView.image = VolumePresentation.image(
-            for: state, accessibilityDescription: VolumePresentation.accessibilityDescription(for: state))
+        imageView.image = VolumePresentation.knobImage(
+            for: state, style: iconStyle, size: Self.knobSize, accessibilityDescription: VolumePresentation.accessibilityDescription(for: state))
         levelBar.level = state.isMuted ? 0 : state.volume
         label.stringValue = state.isMuted ? "Muted" : VolumePresentation.percent(state.volume)
 
@@ -92,7 +95,7 @@ final class VolumeOverlay {
         background.state = .active
         background.maskImage = Self.roundedMask(radius: Self.cornerRadius)
 
-        imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 64, weight: .regular)
+        // The knob is a template image, so the tint gives it the HUD's label color in light and dark mode.
         imageView.contentTintColor = .labelColor
         label.font = .monospacedDigitSystemFont(ofSize: 20, weight: .medium)
         label.textColor = .labelColor

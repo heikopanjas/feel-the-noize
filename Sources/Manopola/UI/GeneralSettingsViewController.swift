@@ -7,6 +7,7 @@ final class GeneralSettingsViewController: NSViewController {
     private let settings: Settings
     private let detentsPopUp = NSPopUpButton()
     private let stepPopUp = NSPopUpButton()
+    private let iconStylePopUp = NSPopUpButton()
     private let reverseCheckbox = NSButton(checkboxWithTitle: "Reverse direction", target: nil, action: nil)
     private let hapticsCheckbox = NSButton(checkboxWithTitle: "Haptic detents", target: nil, action: nil)
     private let overlayCheckbox = NSButton(checkboxWithTitle: "Show volume overlay", target: nil, action: nil)
@@ -36,6 +37,7 @@ final class GeneralSettingsViewController: NSViewController {
         let grid = NSGridView(views: [
             [Self.label("Detents per turn:"), detentsPopUp],
             [Self.label("Volume step:"), stepPopUp],
+            [Self.label("Icon style:"), iconStylePopUp],
             [NSGridCell.emptyContentView, reverseCheckbox],
             [NSGridCell.emptyContentView, hapticsCheckbox],
             [NSGridCell.emptyContentView, overlayCheckbox],
@@ -46,8 +48,8 @@ final class GeneralSettingsViewController: NSViewController {
         grid.rowAlignment = .firstBaseline
         grid.rowSpacing = 8
         grid.columnSpacing = 8
-        grid.row(at: 2).topPadding = 8
-        approvalRow = grid.row(at: 6)
+        grid.row(at: 3).topPadding = 8
+        approvalRow = grid.row(at: 7)
 
         let container = NSView()
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -74,6 +76,11 @@ final class GeneralSettingsViewController: NSViewController {
             detentsPopUp.addItem(withTitle: "\(detents)")
             detentsPopUp.lastItem?.tag = detents
         }
+        for (index, style) in KnobIcon.Style.allCases.enumerated() {
+            iconStylePopUp.addItem(withTitle: style.title)
+            iconStylePopUp.lastItem?.tag = index
+            iconStylePopUp.lastItem?.image = KnobIcon.image(style: style, level: 0.6, isMuted: false, size: 16, accessibilityDescription: nil)
+        }
         for percent in Settings.stepPercentChoices {
             stepPopUp.addItem(withTitle: "\(percent) %")
             stepPopUp.lastItem?.tag = percent
@@ -81,6 +88,7 @@ final class GeneralSettingsViewController: NSViewController {
 
         let actions: [(NSControl, Selector)] = [
             (detentsPopUp, #selector(detentsChanged(_:))), (stepPopUp, #selector(stepChanged(_:))),
+            (iconStylePopUp, #selector(iconStyleChanged(_:))),
             (reverseCheckbox, #selector(reverseChanged(_:))), (hapticsCheckbox, #selector(hapticsChanged(_:))),
             (overlayCheckbox, #selector(overlayChanged(_:))), (loginCheckbox, #selector(loginChanged(_:))),
             (approvalButton, #selector(openLoginItems(_:)))
@@ -98,6 +106,7 @@ final class GeneralSettingsViewController: NSViewController {
     private func refresh() {
         detentsPopUp.selectItem(withTag: settings.detentsPerRevolution)
         stepPopUp.selectItem(withTag: settings.volumeStepPercent)
+        iconStylePopUp.selectItem(withTag: KnobIcon.Style.allCases.firstIndex(of: settings.iconStyle) ?? 0)
         reverseCheckbox.state = settings.reverseDirection ? .on : .off
         hapticsCheckbox.state = settings.hapticDetents ? .on : .off
         overlayCheckbox.state = settings.showOverlay ? .on : .off
@@ -116,6 +125,12 @@ final class GeneralSettingsViewController: NSViewController {
 
     @objc private func detentsChanged(_ sender: NSPopUpButton) {
         settings.detentsPerRevolution = sender.selectedTag()
+    }
+
+    @objc private func iconStyleChanged(_ sender: NSPopUpButton) {
+        let styles = KnobIcon.Style.allCases
+        guard styles.indices.contains(sender.selectedTag()) else { return }
+        settings.iconStyle = styles[sender.selectedTag()]
     }
 
     @objc private func stepChanged(_ sender: NSPopUpButton) {

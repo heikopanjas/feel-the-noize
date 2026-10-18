@@ -33,6 +33,12 @@ package "Dial" {
         + {static} hapticConfiguration(detents : Int, enabled : Bool) : [UInt8]
         + {static} manualTrigger(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16) : [UInt8]
     }
+    class DialBattery {
+        + level : Int?
+        + onChange : (Int?) -> Void
+        + dialConnected()
+        + dialDisconnected()
+    }
     class DialConnection <<enum>> {
         notConnected
         connected
@@ -125,9 +131,14 @@ package "UI" {
         + onMenuWillOpen : () -> Void
         + update(audio : AudioState?, dial : DialConnection, isOutputEnabled : Bool)
         + setAccessDenied(isDenied : Bool)
+        + setDialBatteryLevel(level : Int?)
+    }
+    class KnobIcon <<enum>> {
+        + {static} image(style : Style, level : Float, isMuted : Bool, size : CGFloat) : NSImage
+        + {static} pointerDegrees(for : Float) : CGFloat
     }
     class VolumePresentation <<enum>> {
-        + {static} image(for : AudioState?, accessibilityDescription : String) : NSImage?
+        + {static} knobImage(for : AudioState?, style : KnobIcon.Style, size : CGFloat) : NSImage
         + {static} percent(volume : Float32) : String
     }
     class VolumeOverlay {
@@ -159,6 +170,7 @@ package "Support" {
 }
 
 AppDelegate *-- DialDevice
+AppDelegate *-- DialBattery
 AppDelegate *-- AudioOutput
 AppDelegate *-- DialController
 AppDelegate *-- StatusItemController
@@ -179,6 +191,7 @@ DialController ..> Settings : reads
 
 StatusItemController ..> VolumePresentation : uses
 VolumeOverlay ..> VolumePresentation : uses
+VolumePresentation ..> KnobIcon : draws
 AppDelegate *-- SettingsWindowController
 SettingsWindowController *-- GeneralSettingsViewController
 SettingsWindowController *-- DeviceSettingsViewController

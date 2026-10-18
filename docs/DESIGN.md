@@ -65,7 +65,6 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 - Radial on-screen menus as on the Surface Studio.
 - Multiple Dials at once (the first one matched is used).
 - Mac App Store distribution.
-- Dial battery level (not part of the HID descriptor; see §15).
 
 ## 4. Requirements
 
@@ -85,9 +84,10 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-10 | Optional on-screen overlay for Dial-initiated changes. |
 | FR-11 | Settings window for all options in §7.7. |
 | FR-12 | Launch at login. |
+| FR-13 | A Devices settings tab lists every output device with its connection type and whether it supports volume control and mute; the user selects which devices the Dial works with. New devices are selected by default. On an unselected default output, turning and pressing do nothing. |
 | FR-14 | Devices without volume control can get software volume, opt-in per device: the Dial then controls a software gain applied to the audio sent to the device (§7.9). |
 | FR-15 | Turning the Dial on a device it cannot control plays the end-stop buzz once per gesture, so the user knows nothing will change. |
-| FR-13 | A Devices settings tab lists every output device with its connection type and whether it supports volume control and mute; the user selects which devices the Dial works with. New devices are selected by default. On an unselected default output, turning and pressing do nothing. |
+| FR-18 | The menu shows the Dial's battery level, read from the Bluetooth Battery Service (§7.10). |
 
 ### Non-Functional
 
@@ -117,21 +117,29 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 
 ### 5.2 Menu Bar Icon
 
-The icon is an SF Symbol rendered as a template image:
+The icon is a knob, not a speaker, so it cannot be confused with the system Sound item (decided 2026-10-18 after a quick test with the SF Symbols `dial.*` positions). `KnobIcon` draws it as an 18 pt vector template image in one of three styles, chosen in Settings (§7.6):
 
-| State | Symbol |
+| Style | Look |
 |---|---|
-| Volume > 0, not muted | `speaker.wave.3.fill` with `variableValue` = volume (0…1) |
-| Volume = 0 or muted | `speaker.slash.fill` |
-| Output device without software volume | `speaker.fill`, button `appearsDisabled = true` |
-| No output device | `speaker.fill`, button `appearsDisabled = true` |
-| Dial not connected, or in use by another app | current symbol, button `appearsDisabled = true` |
-| Current output unselected in the Devices tab | current symbol, button `appearsDisabled = true`, accessibility text adds ", Dial off for this output" |
+| Arc (default) | filled knob with a cut-out pointer, inside a 270° arc that is lit up to the level, like the app icon |
+| Ring | outlined circle with a pointer line |
+| Dots | filled knob with a cut-out pointer and seven scale dots lit up to the level |
+
+The pointer sweeps 270° clockwise from lower left (0 %) to lower right (100 %). Unlit parts use 30 % alpha, which the template tint keeps.
+
+| State | Knob |
+|---|---|
+| Volume adjustable, not muted | pointer and lit part at the volume |
+| Muted | outlined knob with a slash, no pointer, nothing lit |
+| Output device without any volume control | knob at full (the device plays at its fixed level), button `appearsDisabled = true` |
+| No output device | knob at minimum, button `appearsDisabled = true` |
+| Dial not connected, or in use by another app | current knob, button `appearsDisabled = true` |
+| Current output unselected in the Devices tab | current knob, button `appearsDisabled = true`, accessibility text adds ", Dial off for this output" |
 
 ### 5.3 Menu
 
 ```
-Surface Dial: Connected            (disabled info item; or Not Connected, or In Use by Another App)
+Surface Dial: Connected, battery 85 %  (disabled info item; or Not Connected, or In Use by Another App)
 Output: MacBook Pro Speakers       (disabled info item; "(Dial off)" appended when unselected)
 Volume: 42 %                       (disabled info item)
 ─────────────
@@ -143,14 +151,14 @@ About Manopola
 Quit Manopola                ⌘Q
 ```
 
-The menu is built once. `NSMenuDelegate.menuNeedsUpdate(_:)` refreshes titles and states right before display. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
+The three status lines use the menu font at the small system size and the secondary label color, so they read as information rather than commands; their text is always set through `attributedTitle`. The battery part appears only while the level is known (§7.10). The menu is built once. `NSMenuDelegate.menuNeedsUpdate(_:)` refreshes titles and states right before display. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
 
 ### 5.4 Volume Overlay
 
 Because Manopola sets the volume through Core Audio, the system volume HUD does not appear. Manopola shows its own overlay for Dial-initiated changes only; changes made with the keyboard keep showing the system HUD, so the two never stack.
 
 - `NSPanel`, style `[.borderless, .nonactivatingPanel]`, `level = .statusBar`, `ignoresMouseEvents = true`, `collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]`.
-- Content: `NSVisualEffectView` (material `.hudWindow`, rounded 18 pt) with the speaker symbol, a 16-segment level bar, and the percentage. 200 × 200 pt.
+- Content: `NSVisualEffectView` (material `.hudWindow`, rounded 18 pt) with the knob from §5.2 at 72 pt in the selected style (tinted with the label color), a 16-segment level bar, and the percentage. 200 × 200 pt.
 - Placement: horizontally centered on the screen that contains the mouse pointer, 140 pt above the bottom of its `visibleFrame`.
 - Shown immediately, faded out over 0.3 s after 1.5 s without further Dial input (`NSAnimationContext`). A single panel instance is reused.
 
@@ -427,7 +435,7 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 ### 7.5 StatusItemController and VolumeOverlay
 
 - `StatusItemController` creates an `NSStatusItem` with `squareLength`, sets the menu from §5.3 and implements `NSMenuDelegate`. `update(audio:dial:)` changes the button image, `appearsDisabled` and the Dial status line (so a retry result shows while the menu is open); the other menu titles are refreshed in `menuNeedsUpdate(_:)`. `menuWillOpen(_:)` calls `onMenuWillOpen`, which `AppDelegate` uses for `DialDevice.retryIfInUseElsewhere()`.
-- Images: `NSImage(systemSymbolName:variableValue:accessibilityDescription:)`, `isTemplate = true`. Accessibility description states volume and mute, e.g. "Volume 42 %, muted", plus ", Surface Dial not connected" when applicable. Symbol choice, percentage text ("42 %") and accessibility text live in `VolumePresentation`, shared by the status item and the overlay.
+- Images: `VolumePresentation.knobImage(for:style:size:accessibilityDescription:)` maps the audio state to a `KnobIcon` template image (§5.2); `StatusItemController.iconStyle` and `VolumeOverlay.iconStyle` are set by `AppDelegate` from `Settings.iconStyle`. Accessibility description states volume and mute, e.g. "Volume 42 %, muted", plus ", Surface Dial not connected" when applicable. Percentage text ("42 %") and accessibility text also live in `VolumePresentation`, shared by the status item and the overlay.
 - `StatusItemController` reports menu actions through `onToggleMute` and `onOpenSettings`; "Allow Input Monitoring…" and "About Manopola" are handled inside it.
 - `VolumeOverlay.show(_:)` is called from `DialController.onAdjusted` and respects the `showOverlay` setting (checked in `AppDelegate`).
 
@@ -440,6 +448,7 @@ Programmatic `NSWindowController` whose content is an `NSTabViewController` with
 | Label | Control | Values |
 |---|---|---|
 | Detents per turn | `NSPopUpButton` | 18, 24, 36, 48, 72 |
+| Icon style | `NSPopUpButton` with a small knob per item | Arc, Ring, Dots (§5.2) |
 | Volume step | `NSPopUpButton` | 1 %, 2 %, 3 %, 5 % |
 | Reverse direction | `NSButton` (checkbox) | — |
 | Haptic detents | `NSButton` (checkbox) | — |
@@ -472,6 +481,7 @@ Connected devices come first, then remembered devices from `Settings.knownDevice
 | `reverseDirection` | Bool | false | — |
 | `hapticDetents` | Bool | true | — |
 | `showOverlay` | Bool | true | — |
+| `iconStyle` | String | `arc` | `arc`, `ring`, `dots`; others fall back to `arc` |
 | `excludedOutputDevices` | [String] | [] | Core Audio device UIDs the Dial leaves alone; stored as exclusions so new devices are enabled |
 | `knownOutputDevices` | [String: String] | [:] | UID to name of every output seen; written only when something is new |
 | `softwareVolumeDevices` | [String] | [] | device UIDs with software volume turned on (§7.9) |
@@ -514,6 +524,17 @@ Teardown reverses the order: stop and destroy the IO proc, destroy the aggregate
 | S5 | A normal quit stops software volume (taps created and destroyed balance); the relaunch restores the stored level. A force-quit during playback returns the audio to full level without intervention, so macOS removes the tap with the process. |
 | S6 | Level felt even across the range (reported by the developer). |
 | S7, S8 | Logic Pro latency and small-buffer behavior deferred by the developer. If they matter for recording, a per-app bypass excludes such apps from the tap (planned, not built). |
+
+### 7.10 Dial Battery Level
+
+The HID descriptor has no battery usage, but the Dial exposes the standard Bluetooth Battery Service (`0x180F`), which macOS reads too (System Information shows it). `DialBattery` reads it with CoreBluetooth over the link the system already holds:
+
+1. On the first `.connected` it creates a `CBCentralManager` on the main queue. The Bluetooth permission prompt therefore appears only once a Dial is present; its text comes from `NSBluetoothAlwaysUsageDescription` in `Configuration/Manopola-Info.plist`.
+2. When powered on, `retrieveConnectedPeripherals(withServices: [0x180F])` finds the peripheral named "Surface Dial", and `connect` attaches Manopola to the existing link.
+3. It discovers the Battery Level characteristic (`0x2A19`), reads it once and subscribes to notifications, so the level stays current without polling.
+4. On disconnect it cancels only its own use of the link and reports the level as unknown.
+
+`AppDelegate` passes the level to `StatusItemController.setDialBatteryLevel(_:)`. Verified 2026-10-18: the level (100 %) arrived about 2 s after the HID connection. If Bluetooth access is denied, the level stays unknown and the Dial line shows no battery.
 
 ## 8. Concurrency Model
 
@@ -591,9 +612,11 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 |---|---|
 | `DialReportTests` | parsing both buffer shapes; clockwise `01 00 01 00 …` → +1; counter-clockwise `01 00 FF FF …` → −1; pressed `01 01 00 00 …`; wrong ID or length → `nil`; exact bytes of the feature report (36 detents, haptics on → `01 24 00 00 03 00 00 00`) and of the three manual patterns in §7.1 |
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
-| `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange` |
+| `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
 | `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
+| `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |
+| `StatusItemTitleTests` | Dial status line for each connection state, with and without a battery level |
 | `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture |
 
 `DialDevice`, `AudioOutput` and the UI are thin adapters over system frameworks and are covered by the manual checklist.
@@ -628,14 +651,16 @@ Manopola/
 │   └── diagrams/                  PlantUML sources (+ rendered SVGs)
 ├── Sources/Manopola/
 │   ├── App/                       main.swift, AppDelegate.swift
-│   ├── Dial/                      DialDevice.swift, DialReport.swift, DialEvent.swift
+│   ├── Dial/                      DialDevice.swift, DialReport.swift, DialEvent.swift,
+│   │                              DialConnection.swift, DialBattery.swift
 │   ├── Control/                   DialController.swift, VolumeStepper.swift
 │   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift,
 │   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift,
 │   │                              SoftwareVolume.swift, SoftwareGain.swift
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
 │   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
-│   │                              DeviceSettingsViewController.swift, VolumePresentation.swift
+│   │                              DeviceSettingsViewController.swift, VolumePresentation.swift,
+│   │                              KnobIcon.swift
 │   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift
 │   └── Resources/                 Assets.xcassets
 └── Tests/ManopolaTests/           Swift Testing suites (from M2)
@@ -681,7 +706,6 @@ make notarize     # notarize, staple, Gatekeeper check
 
 ## 15. Future Ideas
 
-- Dial battery level via the Bluetooth LE Battery Service (`0x180F`) through CoreBluetooth; the HID descriptor has no battery usage.
 - Modes switchable by long press: media transport, scrolling, output device selection.
 - Per-device step size.
 - Input (microphone) mute as an alternative press action.
