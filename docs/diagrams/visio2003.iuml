@@ -1,0 +1,60 @@
+' Shared look for all diagrams: classic Visio 2003 UML stencils.
+' White fills, thin black lines, Arial, square corners, no shadows, no class icons.
+skinparam style strictuml
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam defaultFontColor #000000
+skinparam ArrowColor #000000
+skinparam ArrowThickness 1
+skinparam classAttributeIconSize 0
+skinparam padding 2
+
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #000000
+    BorderThickness 1
+    HeaderBackgroundColor #FFFFFF
+    StereotypeFontSize 10
+}
+
+skinparam interface {
+    BackgroundColor #FFFFFF
+    BorderColor #000000
+}
+
+skinparam package {
+    BackgroundColor #FFFFFF
+    BorderColor #000000
+    FontStyle bold
+}
+
+skinparam note {
+    BackgroundColor #FFFFFF
+    BorderColor #000000
+}
+
+skinparam state {
+    BackgroundColor #FFFFFF
+    BorderColor #000000
+    StartColor #000000
+    EndColor #000000
+}
+
+skinparam sequence {
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    ActorBorderColor #000000
+    GroupBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+}
+
+hide circle
+hide empty members

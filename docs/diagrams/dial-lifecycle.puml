@@ -1,0 +1,28 @@
+@startuml dial-lifecycle
+!include visio2003.iuml
+
+title DialDevice - Connection Lifecycle
+
+[*] --> Stopped
+
+Stopped --> Waiting : start() /\nIOHIDManagerCreate, match 045E:091B, register callbacks,\nschedule on main run loop, open seized (shared fallback)
+
+Waiting --> Connected : device matching callback /\nadopt first Dial, emit connected
+
+state Connected {
+    [*] --> Configuring
+    Configuring --> Ready : send feature report 1\n(detents, auto-trigger)
+    Ready --> Ready : input report /\nparse, emit DialEvent
+    Ready --> Configuring : first report after >= 15 s silence\nor settings changed
+}
+
+Connected --> Waiting : device removal callback /\nreset button state, emit disconnected
+Connected --> Recovering : input report error\nor system did wake
+Waiting --> Recovering : system did wake
+Recovering --> Waiting : after 1 s /\nclose and reopen HID manager
+
+Waiting --> Stopped : stop()
+Connected --> Stopped : stop()
+Recovering --> Stopped : stop()
+
+@enduml

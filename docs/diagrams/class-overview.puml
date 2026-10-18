@@ -1,0 +1,139 @@
+@startuml class-overview
+!include visio2003.iuml
+
+title Manopola - Class Overview
+
+package "App" {
+    class AppDelegate {
+        - settings : Settings
+        - dial : DialDevice
+        - audio : AudioOutput
+        - controller : DialController
+        - statusItem : StatusItemController
+        - overlay : VolumeOverlay
+        + applicationDidFinishLaunching()
+        + applicationWillTerminate()
+    }
+}
+
+package "Dial" {
+    class DialDevice {
+        + onEvent : (DialEvent) -> Void
+        + onConnectionChange : (Bool) -> Void
+        + onAccessDenied : () -> Void
+        + isConnected : Bool
+        + start()
+        + stop()
+        + configure(detentsPerRevolution : Int, hapticsEnabled : Bool)
+        + playHaptic(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16)
+    }
+    class DialReport <<enum>> {
+        + {static} parseInput(reportID : UInt32, bytes : [UInt8]) : DialInputReport?
+        + {static} hapticConfiguration(detents : Int, enabled : Bool) : [UInt8]
+        + {static} manualTrigger(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16) : [UInt8]
+    }
+    class DialEvent <<enum>> {
+        rotated(detents : Int)
+        pressed
+        released
+    }
+}
+
+package "Control" {
+    class DialController {
+        - gesture : GestureState
+        + onAdjusted : (AudioState) -> Void
+        + handle(event : DialEvent)
+        + reset()
+    }
+    class VolumeStepper <<enum>> {
+        + {static} volume(from : Float32, detents : Int, step : Float32) : Float32
+    }
+    interface AudioControlling {
+        + state : AudioState?
+        + setVolume(volume : Float32)
+        + setMuted(muted : Bool)
+    }
+    interface HapticFeedback {
+        + endStop()
+        + muteToggled(isMuted : Bool)
+    }
+}
+
+package "Audio" {
+    class AudioOutput {
+        + onChange : (AudioState?) -> Void
+        + start()
+        + stop()
+    }
+    class AudioState <<struct>> {
+        + deviceID : AudioObjectID
+        + deviceUID : String
+        + deviceName : String
+        + volume : Float32
+        + isMuted : Bool
+        + canSetVolume : Bool
+        + hasHardwareMute : Bool
+    }
+}
+
+package "UI" {
+    class StatusItemController {
+        + onToggleMute : () -> Void
+        + onOpenSettings : () -> Void
+        + update(audio : AudioState?, dialConnected : Bool)
+        + setAccessDenied(isDenied : Bool)
+    }
+    class VolumePresentation <<enum>> {
+        + {static} image(for : AudioState?, accessibilityDescription : String) : NSImage?
+        + {static} percent(volume : Float32) : String
+    }
+    class VolumeOverlay {
+        + show(audio : AudioState)
+    }
+    class SettingsWindowController
+    class SettingsViewController
+}
+
+package "Support" {
+    class Settings {
+        + detentsPerRevolution : Int
+        + volumeStepPercent : Int
+        + reverseDirection : Bool
+        + hapticDetents : Bool
+        + showOverlay : Bool
+        + onChange : () -> Void
+    }
+    class LoginItem <<enum>> {
+        + {static} isEnabled : Bool
+        + {static} status : SMAppService.Status
+        + {static} setEnabled(enabled : Bool)
+    }
+}
+
+AppDelegate *-- DialDevice
+AppDelegate *-- AudioOutput
+AppDelegate *-- DialController
+AppDelegate *-- StatusItemController
+AppDelegate *-- VolumeOverlay
+AppDelegate *-- Settings
+
+DialDevice ..> DialReport : uses
+DialDevice ..> DialEvent : emits
+DialDevice ..|> HapticFeedback
+AudioOutput ..|> AudioControlling
+AudioOutput ..> AudioState : publishes
+
+DialController --> AudioControlling
+DialController --> HapticFeedback
+DialController ..> VolumeStepper : uses
+DialController ..> Settings : reads
+
+StatusItemController ..> VolumePresentation : uses
+VolumeOverlay ..> VolumePresentation : uses
+AppDelegate *-- SettingsWindowController
+SettingsWindowController *-- SettingsViewController
+SettingsViewController ..> Settings : edits
+SettingsViewController ..> LoginItem : toggles
+
+@enduml

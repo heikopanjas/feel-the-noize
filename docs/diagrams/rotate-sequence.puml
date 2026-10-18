@@ -1,0 +1,45 @@
+@startuml rotate-sequence
+!include visio2003.iuml
+
+title Rotation to Volume Change
+
+participant "Surface Dial" as Hardware
+participant "IOKit HID" as HID
+participant ":DialDevice" as Dial
+participant ":DialController" as Controller
+participant ":AudioOutput" as Audio
+participant "Core Audio" as CoreAudio
+participant ":StatusItemController" as Status
+participant ":VolumeOverlay" as Overlay
+
+Hardware -> Hardware : haptic detent click\n(auto-trigger, on device)
+Hardware -> HID : input report 1\n(button, delta)
+HID -> Dial : input report callback\n(main run loop)
+activate Dial
+Dial -> Dial : DialReport.parseInput()
+Dial -> Controller : handle(.rotated(detents: n))
+deactivate Dial
+activate Controller
+Controller -> Controller : VolumeStepper.volume()
+alt muted
+    Controller -> Audio : setMuted(false)
+end
+Controller -> Audio : setVolume(v)
+activate Audio
+Audio -> CoreAudio : AudioObjectSetPropertyData\n(VirtualMainVolume)
+Audio -> Audio : update cached state
+deactivate Audio
+opt volume already at 0 or 1
+    Controller -> Dial : endStop()
+    Dial -> HID : output report 1 (manual trigger)
+end
+Controller -> Overlay : onAdjusted(audio.state)\n(only for dial-initiated changes)
+deactivate Controller
+
+CoreAudio --> Audio : property listener\n(VirtualMainVolume / VolumeScalar / Mute)
+activate Audio
+Audio -> Audio : re-read state
+Audio -> Status : onChange(state)\n(via AppDelegate)
+deactivate Audio
+
+@enduml

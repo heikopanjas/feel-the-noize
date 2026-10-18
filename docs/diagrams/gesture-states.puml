@@ -1,0 +1,20 @@
+@startuml gesture-states
+!include visio2003.iuml
+
+title DialController - Gesture Recognition
+
+[*] --> Idle
+
+Idle --> Idle : rotated(n) /\nunmute if muted,\nstep volume by n x step
+Idle --> PressedStill : pressed
+
+PressedStill --> Idle : released /\ntoggle mute, haptic confirm
+PressedStill --> PressedTurned : rotated(n) /\nunmute if muted,\nstep volume by n x step / 4
+
+PressedTurned --> PressedTurned : rotated(n) /\nstep volume by n x step / 4
+PressedTurned --> Idle : released /\nno mute toggle
+
+PressedStill --> Idle : dial disconnected
+PressedTurned --> Idle : dial disconnected
+
+@enduml
