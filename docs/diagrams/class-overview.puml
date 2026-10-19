@@ -27,6 +27,7 @@ package "Dial" {
         + configure(detentsPerRevolution : Int, hapticsEnabled : Bool)
         + retryIfInUseElsewhere()
         + playHaptic(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16)
+        + sendKeepAlive()
     }
     class DialReport <<enum>> {
         + {static} parseInput(reportID : UInt32, bytes : [UInt8]) : DialInputReport?
@@ -38,6 +39,13 @@ package "Dial" {
         + onChange : (Int?) -> Void
         + dialConnected()
         + dialDisconnected()
+    }
+    class DialKeepAwake {
+        + isEnabled : Bool
+        + isDialConnected : Bool
+        + areDisplaysAwake : Bool
+        + start()
+        + stop()
     }
     class DialConnection <<enum>> {
         notConnected
@@ -156,6 +164,7 @@ package "Support" {
         + reverseDirection : Bool
         + hapticDetents : Bool
         + showOverlay : Bool
+        + keepDialAwake : Bool
         + excludedDeviceUIDs : Set<String>
         + knownDevices : [String: String]
         + onChange : () -> Void
@@ -171,6 +180,7 @@ package "Support" {
 
 AppDelegate *-- DialDevice
 AppDelegate *-- DialBattery
+AppDelegate *-- DialKeepAwake
 AppDelegate *-- AudioOutput
 AppDelegate *-- DialController
 AppDelegate *-- StatusItemController
@@ -181,6 +191,7 @@ DialDevice ..> DialReport : uses
 DialDevice ..> DialEvent : emits
 DialDevice ..> DialConnection : publishes
 DialDevice ..|> HapticFeedback
+DialKeepAwake ..> DialDevice : sends keep-alive
 AudioOutput ..|> AudioControlling
 AudioOutput ..> AudioState : publishes
 

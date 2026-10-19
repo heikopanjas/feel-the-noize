@@ -19,6 +19,7 @@ final class Settings {
         static let reverseDirection = "reverseDirection"
         static let hapticDetents = "hapticDetents"
         static let showOverlay = "showOverlay"
+        static let keepDialAwake = "keepDialAwake"
         static let iconStyle = "iconStyle"
         static let excludedOutputDevices = "excludedOutputDevices"
         static let knownOutputDevices = "knownOutputDevices"
@@ -42,6 +43,7 @@ final class Settings {
             Key.reverseDirection: false,
             Key.hapticDetents: true,
             Key.showOverlay: true,
+            Key.keepDialAwake: true,
             Key.iconStyle: KnobIcon.Style.arc.rawValue
         ])
     }
@@ -69,6 +71,12 @@ final class Settings {
     var showOverlay: Bool {
         get { defaults.bool(forKey: Key.showOverlay) }
         set { write(newValue, forKey: Key.showOverlay) }
+    }
+
+    /// Keeps the Dial out of its idle sleep while the displays are awake (docs/DESIGN.md §7.14).
+    var keepDialAwake: Bool {
+        get { defaults.bool(forKey: Key.keepDialAwake) }
+        set { write(newValue, forKey: Key.keepDialAwake) }
     }
 
     /// The knob drawn in the menu bar and the overlay; unknown stored values fall back to the arc.

@@ -15,7 +15,7 @@ No Accessibility permission, no third-party dependencies, no network access.
 
 ## Installation
 
-1. Download `Manopola-1.0.0.zip` from the releases and unzip it.
+1. Download `Manopola-1.1.0.zip` from the releases and unzip it.
 2. Move `Manopola.app` to `/Applications` and open it. The app is notarized, so it opens without warnings.
 3. Pair the Dial if you have not yet: hold the pairing button next to the batteries for about 5 seconds until the light flashes, then click Connect in System Settings → Bluetooth.
 
@@ -48,8 +48,11 @@ Settings has two tabs.
 | Icon style | Arc, Ring, Dots | Arc |
 | Reverse direction | on or off | off |
 | Haptic detents | on or off | on |
+| Keep Dial awake while the Mac is in use | on or off | on |
 | Show volume overlay | on or off | on |
 | Launch at login | on or off | off |
+
+On its own, the Dial goes to sleep about 5 minutes after you last touch it, and the next turn only wakes it, which takes about 1.5 seconds. With **Keep Dial awake while the Mac is in use**, Manopola keeps it ready as long as your displays are on, including while a video plays. Once the displays sleep, the Dial sleeps too, which saves its batteries. When the Dial wakes from sleep, a single click tells you it is ready.
 
 **Devices** lists every audio output with its connection type and whether it supports volume control and mute. Tick the devices the Dial should work with. New devices are ticked automatically. When the current output is unticked, the Dial does nothing and the menu bar icon dims. Devices that were connected before stay in the list while they are away, so you can set them up in advance. Devices without volume control can only be muted, unless you turn on Software Volume for them. When the Dial cannot change anything on the current output, turning it gives a short buzz.
 
@@ -64,7 +67,7 @@ Some audio interfaces, such as the MOTU M2, and many HDMI outputs have no volume
 
 ### Troubleshooting
 
-- **The Dial does not respond.** Check that it is connected in System Settings → Bluetooth. After a while without use the Dial sleeps; turn it once to wake it.
+- **The Dial does not respond.** Check that it is connected in System Settings → Bluetooth. After a while without use the Dial sleeps; turn it once to wake it and wait for the click. Turn on Keep Dial awake while the Mac is in use to avoid this.
 - **"Allow Input Monitoring…" appears in the menu.** macOS blocked access to the Dial. Choose the item, allow Manopola under Input Monitoring, then reopen the app.
 - **Turning does nothing on this output.** The device has no software volume control; adjust it on the device itself.
 

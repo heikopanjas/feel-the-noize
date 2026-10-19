@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let controller: DialController
     private let overlay = VolumeOverlay()
     private let battery = DialBattery()
+    private let keepAwake: DialKeepAwake
     private var statusItem: StatusItemController?
     private var settingsWindow: SettingsWindowController?
     private var isAccessDenied = false
@@ -24,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.audio = audio
         self.dial = dial
         controller = DialController(audio: audio, haptics: dial, settings: { settings.controlSettings })
+        keepAwake = DialKeepAwake { dial.sendKeepAlive() }
         super.init()
     }
 
@@ -45,12 +47,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.onChange = { [weak self] in
             self?.applyIconStyle()
             self?.applyDialConfiguration()
+            self?.applyKeepAwake()
             self?.audio.refreshSoftwareVolume()
             // Excluding or including the current output changes the icon.
             self?.refreshStatusItem()
         }
         // Stored before start(), so the first match already gets the user's configuration.
         applyDialConfiguration()
+        applyKeepAwake()
 
         dial.onEvent = { [weak self] event in
             Log.control.debug("Dial event: \(String(describing: event), privacy: .public)")
@@ -62,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.controller.reset()
             }
             self?.confirmReconnection(connection)
+            self?.keepAwake.isDialConnected = connection == .connected
             if connection == .connected {
                 self?.battery.dialConnected()
             }
@@ -93,34 +98,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         audio.start()
         dial.start()
+        keepAwake.start()
         refreshStatusItem()
-
-        #if DEBUG
-        startKeepAliveSpike()
-        #endif
     }
-
-    #if DEBUG
-    // Keep-awake spike (docs/DESIGN.md §14): sends the reports named in the `keepAliveSpike` default every 4 minutes.
-    private var keepAliveSpikeTask: Task<Void, Never>?
-
-    private func startKeepAliveSpike() {
-        let names = UserDefaults.standard.stringArray(forKey: "keepAliveSpike") ?? []
-        let reports = names.compactMap(DialDevice.KeepAliveReport.init(rawValue:))
-        guard !reports.isEmpty else { return }
-        Log.dial.info("Keep-alive spike with \(names, privacy: .public) every 4 minutes")
-        keepAliveSpikeTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(240))
-                guard let self, !Task.isCancelled else { return }
-                Log.dial.info("Keep-alive spike tick, Dial \(String(describing: self.dial.connection), privacy: .public)")
-                self.dial.sendKeepAlive(reports)
-            }
-        }
-    }
-    #endif
 
     func applicationWillTerminate(_ notification: Notification) {
+        keepAwake.stop()
         dial.stop()
         audio.stop()
     }
@@ -170,6 +153,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appliedDetents = detents
         appliedHaptics = haptics
         dial.configure(detentsPerRevolution: detents, hapticsEnabled: haptics)
+    }
+
+    private func applyKeepAwake() {
+        keepAwake.isEnabled = settings.keepDialAwake
     }
 
     private func showSettings() {

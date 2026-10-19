@@ -22,6 +22,7 @@ struct SettingsTests {
             #expect(settings.reverseDirection == false)
             #expect(settings.hapticDetents == true)
             #expect(settings.showOverlay == true)
+            #expect(settings.keepDialAwake == true)
         }
     }
 
@@ -32,11 +33,13 @@ struct SettingsTests {
             settings.reverseDirection = true
             settings.hapticDetents = false
             settings.showOverlay = false
+            settings.keepDialAwake = false
             #expect(settings.detentsPerRevolution == 72)
             #expect(settings.volumeStepPercent == 5)
             #expect(settings.reverseDirection == true)
             #expect(settings.hapticDetents == false)
             #expect(settings.showOverlay == false)
+            #expect(settings.keepDialAwake == false)
             #expect(settings.controlSettings == ControlSettings(stepPercent: 5, reverseDirection: true))
         }
     }

@@ -10,6 +10,7 @@ final class GeneralSettingsViewController: NSViewController {
     private let iconStylePopUp = NSPopUpButton()
     private let reverseCheckbox = NSButton(checkboxWithTitle: "Reverse direction", target: nil, action: nil)
     private let hapticsCheckbox = NSButton(checkboxWithTitle: "Haptic detents", target: nil, action: nil)
+    private let keepAwakeCheckbox = NSButton(checkboxWithTitle: "Keep Dial awake while the Mac is in use", target: nil, action: nil)
     private let overlayCheckbox = NSButton(checkboxWithTitle: "Show volume overlay", target: nil, action: nil)
     private let loginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
     private let approvalLabel = NSTextField(labelWithString: "Launching at login needs your approval.")
@@ -40,6 +41,7 @@ final class GeneralSettingsViewController: NSViewController {
             [Self.label("Icon style:"), iconStylePopUp],
             [NSGridCell.emptyContentView, reverseCheckbox],
             [NSGridCell.emptyContentView, hapticsCheckbox],
+            [NSGridCell.emptyContentView, keepAwakeCheckbox],
             [NSGridCell.emptyContentView, overlayCheckbox],
             [NSGridCell.emptyContentView, loginCheckbox],
             [NSGridCell.emptyContentView, approvalStack]
@@ -49,7 +51,7 @@ final class GeneralSettingsViewController: NSViewController {
         grid.rowSpacing = 8
         grid.columnSpacing = 8
         grid.row(at: 3).topPadding = 8
-        approvalRow = grid.row(at: 7)
+        approvalRow = grid.row(at: 8)
 
         let container = NSView()
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -90,6 +92,7 @@ final class GeneralSettingsViewController: NSViewController {
             (detentsPopUp, #selector(detentsChanged(_:))), (stepPopUp, #selector(stepChanged(_:))),
             (iconStylePopUp, #selector(iconStyleChanged(_:))),
             (reverseCheckbox, #selector(reverseChanged(_:))), (hapticsCheckbox, #selector(hapticsChanged(_:))),
+            (keepAwakeCheckbox, #selector(keepAwakeChanged(_:))),
             (overlayCheckbox, #selector(overlayChanged(_:))), (loginCheckbox, #selector(loginChanged(_:))),
             (approvalButton, #selector(openLoginItems(_:)))
         ]
@@ -109,6 +112,7 @@ final class GeneralSettingsViewController: NSViewController {
         iconStylePopUp.selectItem(withTag: KnobIcon.Style.allCases.firstIndex(of: settings.iconStyle) ?? 0)
         reverseCheckbox.state = settings.reverseDirection ? .on : .off
         hapticsCheckbox.state = settings.hapticDetents ? .on : .off
+        keepAwakeCheckbox.state = settings.keepDialAwake ? .on : .off
         overlayCheckbox.state = settings.showOverlay ? .on : .off
         loginCheckbox.state = LoginItem.isEnabled ? .on : .off
         approvalRow?.isHidden = LoginItem.status != .requiresApproval
@@ -143,6 +147,10 @@ final class GeneralSettingsViewController: NSViewController {
 
     @objc private func hapticsChanged(_ sender: NSButton) {
         settings.hapticDetents = sender.state == .on
+    }
+
+    @objc private func keepAwakeChanged(_ sender: NSButton) {
+        settings.keepDialAwake = sender.state == .on
     }
 
     @objc private func overlayChanged(_ sender: NSButton) {

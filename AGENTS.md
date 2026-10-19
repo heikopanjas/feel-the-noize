@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-10-18
+**Last updated:** 2026-10-19
 
 ## Mission Statement
 
@@ -146,3 +146,8 @@ Semantic versioning via `MARKETING_VERSION` in `project.yml`; bump `CURRENT_PROJ
 - Menu bar icon and overlay show a knob instead of a speaker, so Manopola is not confused with the system Sound item. A quick test with the SF Symbols `dial.*` positions confirmed the idea; the final `KnobIcon` draws three vector template styles (Arc default, Ring, Dots), selectable in Settings as `iconStyle`. Reason: chosen by the developer after comparing rendered mockups; continuous pointer and a real mute state, which the five SF Symbols lack.
 - Roadmap M6 to M8 added to DESIGN.md as FR-19 to FR-21 with sections 7.11 to 7.13, checklist items 14 to 17 and risks R9 to R11: device menu with outputs, inputs and switching, an Input line between output and volume, accessory battery levels, and a kept input device. Reason: requested by the developer; macOS moves the input to newly connected AirPods during calls on the MOTU M2.
 - Decided with the developer: battery levels come from `IOPSCopyPowerSourcesByType(4)` through `dlsym`, as validated in Voltaic; clicking a device in the menu makes it the default; the kept input reverts every change while it is connected, and selecting an input in the menu moves the keep. Reason: CoreBluetooth misses AirPods and system_profiler is too slow for a menu; timing heuristics to tell automatic from manual switches are unreliable.
+
+### 2026-10-19
+
+- Version 1.1.0 build 2 for the first distributed build after 1.0.0, chosen by the developer. Reason: the Devices tab, software volume, ready click, knob icon and Dial battery level are new features since 1.0.0. README download name updated to match.
+- Keep-awake ships in 1.1.0 as `DialKeepAwake` with the setting `keepDialAwake`, on by default, and the debug-only spike is removed. It sends all three spike reports every 3 minutes while the Dial is connected and the displays are awake (DESIGN.md §7.14, FR-16). Reason: the developer found that the release build lacked the fix, because the spike only existed in debug builds. All three reports chosen by the developer, since the responsible one is not isolated. Displays awake instead of recent input, so the Dial stays ready during a video. NFR-2 gains this timer as its second exception.
