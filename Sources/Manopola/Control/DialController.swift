@@ -93,6 +93,10 @@ final class DialController {
         }
         else {
             audio.setVolume(target)
+            // Another device owns the output and undid an earlier change: buzz so the user knows nothing changed.
+            if audio.state?.isInUseElsewhere == true {
+                hitEndStop()
+            }
         }
 
         if let adjusted = audio.state {

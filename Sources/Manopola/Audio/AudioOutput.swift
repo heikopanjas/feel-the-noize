@@ -13,6 +13,9 @@ protocol SoftwareVolumePreferences: AnyObject {
 final class AudioOutput: AudioControlling {
     // Core Audio reads a written volume back with float noise, e.g. 0.58 as 0.58000004. Smaller differences are no change.
     private static let volumeTolerance: Float32 = 0.0001
+    /// While another device owns the output, a write only probes whether the Mac has it back; once a second is enough
+    /// and spares the device a command per detent.
+    private static let probeInterval: Duration = .seconds(1)
 
     /// `nil` when there is no output device.
     private(set) var state: AudioState?
@@ -29,6 +32,9 @@ final class AudioOutput: AudioControlling {
     private var deviceListener: CoreAudioProperty.ListenerBlock?
     /// Volumes remembered by emulated mute, keyed by device UID. Kept in memory only.
     private var emulatedMuteVolumes: [String: Float32] = [:]
+    private var volumeCheck = VolumeWriteCheck()
+    private var volumeCheckTask: Task<Void, Never>?
+    private var lastProbe: ContinuousClock.Instant?
 
     func start() {
         guard systemListener == nil else { return }
@@ -61,6 +67,7 @@ final class AudioOutput: AudioControlling {
         }
         detachFromDevice()
         softwareVolume.stop()
+        resetVolumeCheck()
         systemListener = nil
         deviceListener = nil
     }
@@ -74,11 +81,23 @@ final class AudioOutput: AudioControlling {
     func setVolume(_ volume: Float32) {
         guard var state, state.canSetVolume else { return }
         let volume = min(max(volume, 0), 1)
+        if state.isInUseElsewhere {
+            let now = ContinuousClock.now
+            if let lastProbe, now - lastProbe < Self.probeInterval {
+                return
+            }
+            lastProbe = now
+        }
         do {
+            if !state.isSoftwareVolume {
+                checkVolumeWrite(volume, current: state.volume)
+            }
             try writeVolume(volume, state: state)
             if state.isSoftwareVolume {
                 preferences?.setSoftwareVolumeLevel(state.deviceUID, volume)
             }
+            // A probe is not shown; the state changes only once the device keeps the new volume.
+            guard !state.isInUseElsewhere else { return }
             state.volume = volume
             if !state.hasHardwareMute, volume > 0, emulatedMuteVolumes.removeValue(forKey: state.deviceUID) != nil {
                 state.isMuted = false
@@ -144,6 +163,26 @@ final class AudioOutput: AudioControlling {
         }
     }
 
+    // MARK: - Rejected Writes
+
+    private func checkVolumeWrite(_ volume: Float32, current: Float32) {
+        volumeCheck.willWrite(volume, current: current)
+        volumeCheckTask?.cancel()
+        volumeCheckTask = Task { [weak self] in
+            try? await Task.sleep(for: VolumeWriteCheck.window)
+            guard !Task.isCancelled, let self else { return }
+            volumeCheck.finish()
+            refresh()
+        }
+    }
+
+    private func resetVolumeCheck() {
+        volumeCheckTask?.cancel()
+        volumeCheckTask = nil
+        volumeCheck = VolumeWriteCheck()
+        lastProbe = nil
+    }
+
     // MARK: - Software Volume
 
     /// Starts or stops software volume so it runs exactly for a default output that lacks volume control and is opted in.
@@ -195,6 +234,8 @@ final class AudioOutput: AudioControlling {
 
     private func attach(to deviceID: AudioObjectID) {
         observedDeviceID = deviceID
+        // A rejection belongs to the device that refused; another device starts unchecked.
+        resetVolumeCheck()
         guard let deviceListener else { return }
         for var address in Self.observedDeviceAddresses {
             let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, .main, deviceListener)
@@ -241,6 +282,15 @@ final class AudioOutput: AudioControlling {
             newState?.volume = state.volume
         }
         guard newState != state else { return }
+        // Only a change on the same device; switching away from a rejected device is no news about the new one.
+        if let newState, let state, newState.deviceID == state.deviceID, newState.isInUseElsewhere != state.isInUseElsewhere {
+            if newState.isInUseElsewhere {
+                Log.audio.notice("\(newState.deviceName, privacy: .public) undid the volume change; another device owns it")
+            }
+            else {
+                Log.audio.notice("\(newState.deviceName, privacy: .public) accepts volume changes again")
+            }
+        }
         state = newState
         onChange?(newState)
     }
@@ -255,6 +305,7 @@ final class AudioOutput: AudioControlling {
         var volume: Float32
         if nativeCanSetVolume {
             volume = try CoreAudioProperty.readVolume(of: deviceID)
+            volumeCheck.didRead(volume)
         }
         else {
             volume = isSoftwareVolume ? softwareVolume.level : 1
@@ -279,7 +330,8 @@ final class AudioOutput: AudioControlling {
 
         return AudioState(
             deviceID: deviceID, deviceUID: uid, deviceName: name, volume: volume, isMuted: isMuted, canSetVolume: canSetVolume,
-            hasHardwareMute: hasHardwareMute, isSoftwareVolume: isSoftwareVolume)
+            hasHardwareMute: hasHardwareMute, isSoftwareVolume: isSoftwareVolume,
+            isInUseElsewhere: nativeCanSetVolume && volumeCheck.isRejected)
     }
 
     // MARK: - Property Addresses

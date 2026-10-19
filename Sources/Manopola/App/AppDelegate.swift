@@ -9,13 +9,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlay = VolumeOverlay()
     private let battery = DialBattery()
     private let keepAwake: DialKeepAwake
+    private let userActivity = UserActivity()
     private var statusItem: StatusItemController?
     private var settingsWindow: SettingsWindowController?
     private var isAccessDenied = false
     private var appliedDetents: Int?
     private var appliedHaptics: Bool?
-    /// The first connection after launch stays silent; later ones are wake-ups and confirm readiness with a click.
-    private var hasDialConnectedBefore = false
+    /// A Dial that is already awake at launch connects silently; every other connection is a wake-up the user caused and
+    /// confirms readiness with a click.
+    private var isReadyClickSkipped = false
 
     override init() {
         let settings = Settings()
@@ -60,13 +62,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Log.control.debug("Dial event: \(String(describing: event), privacy: .public)")
             self?.controller.handle(event)
         }
+        // The seized Dial bypasses the HID event system, so its use is declared to macOS like mouse input.
+        dial.onActivity = { [weak self] in
+            self?.userActivity.declare()
+        }
         dial.onConnectionChange = { [weak self] connection in
             Log.control.info("Dial \(String(describing: connection), privacy: .public)")
             if connection != .connected {
                 self?.controller.reset()
             }
-            self?.confirmReconnection(connection)
+            // Keep-awake first, so a Dial awake at launch can get its first report right away.
             self?.keepAwake.isDialConnected = connection == .connected
+            self?.confirmConnection(connection)
             if connection == .connected {
                 self?.battery.dialConnected()
             }
@@ -98,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         audio.start()
         dial.start()
+        isReadyClickSkipped = dial.isPresent
         keepAwake.start()
         refreshStatusItem()
     }
@@ -132,13 +140,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.setMuted(!state.isMuted)
     }
 
-    /// The turn that wakes the Dial is lost while macOS reconnects, so a click tells the user when the Dial is ready.
-    private func confirmReconnection(_ connection: DialConnection) {
+    /// The turn that wakes the Dial is lost while macOS reconnects, so a click tells the user when the Dial is ready. An
+    /// app cannot wake a sleeping Dial (docs/DESIGN.md §2.1), so after a launch the user's touch is the wake-up as well.
+    /// A Dial already awake at launch gets no click but an immediate keep-alive, since its idle time is unknown (§7.14).
+    private func confirmConnection(_ connection: DialConnection) {
         guard connection == .connected else { return }
-        if hasDialConnectedBefore {
+        if isReadyClickSkipped {
+            keepAwake.sendNow()
+        }
+        else {
             dial.playHaptic(.click)
         }
-        hasDialConnectedBefore = true
+        isReadyClickSkipped = false
     }
 
     private func applyIconStyle() {

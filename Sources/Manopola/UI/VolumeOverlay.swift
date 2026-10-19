@@ -26,7 +26,12 @@ final class VolumeOverlay {
         imageView.image = VolumePresentation.knobImage(
             for: state, style: iconStyle, size: Self.knobSize, accessibilityDescription: VolumePresentation.accessibilityDescription(for: state))
         levelBar.level = state.isMuted ? 0 : state.volume
-        label.stringValue = state.isMuted ? "Muted" : VolumePresentation.percent(state.volume)
+        if state.isInUseElsewhere {
+            label.stringValue = "Other Device"
+        }
+        else {
+            label.stringValue = state.isMuted ? "Muted" : VolumePresentation.percent(state.volume)
+        }
 
         positionOnPointerScreen()
         showGeneration += 1

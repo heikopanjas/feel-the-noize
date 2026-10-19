@@ -21,7 +21,9 @@ package "Dial" {
         + onEvent : (DialEvent) -> Void
         + onConnectionChange : (DialConnection) -> Void
         + onAccessDenied : () -> Void
+        + onActivity : () -> Void
         + connection : DialConnection
+        + isPresent : Bool
         + start()
         + stop()
         + configure(detentsPerRevolution : Int, hapticsEnabled : Bool)
@@ -45,6 +47,7 @@ package "Dial" {
         + isDialConnected : Bool
         + areDisplaysAwake : Bool
         + start()
+        + sendNow()
         + stop()
     }
     class DialConnection <<enum>> {
@@ -129,6 +132,14 @@ package "Audio" {
         + isMuted : Bool
         + canSetVolume : Bool
         + hasHardwareMute : Bool
+        + isSoftwareVolume : Bool
+        + isInUseElsewhere : Bool
+    }
+    class VolumeWriteCheck <<struct>> {
+        + isRejected : Bool
+        + willWrite(volume : Float32, current : Float32)
+        + didRead(volume : Float32)
+        + finish()
     }
 }
 
@@ -171,6 +182,9 @@ package "Support" {
         + setDevice(uid : String, enabled : Bool)
         + rememberDevices(names : [String: String])
     }
+    class UserActivity {
+        + declare()
+    }
     class LoginItem <<enum>> {
         + {static} isEnabled : Bool
         + {static} status : SMAppService.Status
@@ -181,6 +195,7 @@ package "Support" {
 AppDelegate *-- DialDevice
 AppDelegate *-- DialBattery
 AppDelegate *-- DialKeepAwake
+AppDelegate *-- UserActivity
 AppDelegate *-- AudioOutput
 AppDelegate *-- DialController
 AppDelegate *-- StatusItemController
@@ -194,6 +209,7 @@ DialDevice ..|> HapticFeedback
 DialKeepAwake ..> DialDevice : sends keep-alive
 AudioOutput ..|> AudioControlling
 AudioOutput ..> AudioState : publishes
+AudioOutput *-- VolumeWriteCheck
 
 DialController --> AudioControlling
 DialController --> HapticFeedback

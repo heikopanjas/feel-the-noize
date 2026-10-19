@@ -6,12 +6,21 @@ import IOKit.hid
 /// The manager is scheduled on the main run loop, so every IOKit callback arrives on the main thread.
 final class DialDevice: HapticFeedback {
     var onEvent: ((DialEvent) -> Void)?
+    /// Every input report from the Dial, a touch included, so the owner can treat it like mouse input.
+    var onActivity: (() -> Void)?
     var onConnectionChange: ((DialConnection) -> Void)?
     var onAccessDenied: (() -> Void)?
     private(set) var connection = DialConnection.notConnected
 
     var isConnected: Bool {
         connection == .connected
+    }
+
+    /// Whether IOKit sees an awake Dial, adopted or not. Matching callbacks arrive asynchronously, so this is the only way
+    /// to tell right after `start()` or a rebuild.
+    var isPresent: Bool {
+        guard let manager, let devices = IOHIDManagerCopyDevices(manager) else { return false }
+        return CFSetGetCount(devices) > 0
     }
 
     // The Dial powers down when idle and may come back with its default configuration.
@@ -60,7 +69,7 @@ final class DialDevice: HapticFeedback {
         closeManager(keepingConnection: true)
         openManager()
         // Matching callbacks arrive asynchronously; if the Dial vanished meanwhile, none will, so check right away.
-        if let manager, let devices = IOHIDManagerCopyDevices(manager), CFSetGetCount(devices) > 0 {
+        if isPresent {
             return
         }
         blockedDevice = nil
@@ -288,6 +297,7 @@ final class DialDevice: HapticFeedback {
             Log.dial.debug("Ignoring unrecognized input report")
             return
         }
+        onActivity?()
 
         if report.isPressed != isPressed {
             isPressed = report.isPressed

@@ -2,7 +2,7 @@ import AppKit
 
 /// Menu bar icon and menu (docs/DESIGN.md §5.2, §5.3, §7.5).
 ///
-/// `update(audio:dial:)` changes the icon and the Dial line; other menu titles are refreshed right before the menu opens.
+/// `update(audio:dial:isOutputEnabled:)` changes the icon and every menu line, so an open menu follows the Dial.
 final class StatusItemController: NSObject, NSMenuDelegate {
     private static let inputMonitoringSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 
@@ -42,8 +42,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         self.audio = audio
         self.dial = dial
         self.isOutputEnabled = isOutputEnabled
-        // Updated here too, so a retry started by opening the menu shows its result while the menu is open.
-        Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: dialBatteryLevel))
+        // Titles are set on every change, not when the menu opens: turning the Dial or a retry started by opening the
+        // menu must show while the menu is open.
+        updateMenuItems()
 
         guard let button = statusItem.button else { return }
         var description = VolumePresentation.accessibilityDescription(for: audio)
@@ -56,7 +57,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             description += ", Dial off for this output"
         }
         button.image = VolumePresentation.knobImage(for: audio, style: iconStyle, size: Self.iconSize, accessibilityDescription: description)
-        button.appearsDisabled = dial != .connected || audio?.canSetVolume != true || !isOutputEnabled
+        button.appearsDisabled =
+            dial != .connected || audio?.canSetVolume != true || audio?.isInUseElsewhere == true || !isOutputEnabled
     }
 
     /// `nil` while the level is unknown, for example right after the Dial connected.
@@ -102,7 +104,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         onMenuWillOpen?()
     }
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    private func updateMenuItems() {
         Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: dialBatteryLevel))
         let suffix = audio != nil && !isOutputEnabled ? " (Dial off)" : ""
         Self.setInfoTitle(outputItem, "Output: \(audio?.deviceName ?? "None")\(suffix)")
@@ -112,6 +114,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 Self.setInfoTitle(volumeItem, "Volume: –")
             case .some(let state) where !state.canSetVolume:
                 Self.setInfoTitle(volumeItem, "Volume: not adjustable")
+            case .some(let state) where state.isInUseElsewhere:
+                Self.setInfoTitle(volumeItem, "Volume: in use by another device")
             case .some(let state):
                 let suffix = state.isSoftwareVolume ? " (software)" : ""
                 Self.setInfoTitle(volumeItem, "Volume: \(VolumePresentation.percent(state.volume))\(suffix)")

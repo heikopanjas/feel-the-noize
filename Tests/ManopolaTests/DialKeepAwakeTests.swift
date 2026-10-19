@@ -35,6 +35,19 @@ struct DialKeepAwakeTests {
         #expect(!keepAwake.isRunning)
     }
 
+    @Test func sendNowSendsOnlyWhileRunning() {
+        var sendCount = 0
+        let keepAwake = DialKeepAwake { sendCount += 1 }
+        keepAwake.sendNow()
+        #expect(sendCount == 0)
+
+        keepAwake.isEnabled = true
+        keepAwake.isDialConnected = true
+        keepAwake.sendNow()
+        keepAwake.stop()
+        #expect(sendCount == 1)
+    }
+
     @Test func sendsAfterEachInterval() async {
         var sendCount = 0
         let keepAwake = DialKeepAwake(interval: .milliseconds(10)) { sendCount += 1 }

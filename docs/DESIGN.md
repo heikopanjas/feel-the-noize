@@ -32,7 +32,7 @@ The app is a native AppKit menu bar utility with no third-party dependencies. Th
 |---|---|
 | Vendor / Product ID | `0x045E` / `0x091B` |
 | Transport | Bluetooth LE (HID over GATT), requires Bluetooth 4.0. Verified 2026-10-18: IOKit reports transport "Bluetooth Low Energy", primary usage Generic Desktop `0x0E`, max input / output / feature report sizes 73 / 73 / 53 bytes (the vendor collections are larger than report 1) |
-| Sleep and wake | Verified 2026-10-18: the Dial disconnects 4 min 57 s after the last input report (touch released), three times out of three. On wake, macOS needs about 1.6 s from the first advertisement to the HID device match (link 1 ms, encryption 0.29 s, link ready 0.63 s, HID setup 1.0 s); Manopola's share is under 1 ms. The turn that wakes the Dial is lost. macOS reads the battery level over Bluetooth (System Information shows it). |
+| Sleep and wake | Verified 2026-10-18: the Dial disconnects 4 min 57 s after the last input report (touch released), three times out of three. On wake, macOS needs about 1.6 s from the first advertisement to the HID device match (link 1 ms, encryption 0.29 s, link ready 0.63 s, HID setup 1.0 s); Manopola's share is under 1 ms. The turn that wakes the Dial is lost. Verified 2026-10-19: the Mac cannot wake a sleeping Dial. Right after the disconnect, bluetoothd puts the Dial on its LE filter accept list and keeps a connection pending, yet the link only came up when the Dial was touched 4 min later, so the Dial stops advertising while asleep and no app call can reach it. macOS reads the battery level over Bluetooth (System Information shows it). |
 | Power | 2 × AAA |
 | Controls | rotation (relative, up to 3600 steps per revolution), one push button |
 | Feedback | haptic motor, controllable via HID haptics usage page `0x0E` |
@@ -91,6 +91,7 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-14 | Devices without volume control can get software volume, opt-in per device: the Dial then controls a software gain applied to the audio sent to the device (§7.9). |
 | FR-15 | Turning the Dial on a device it cannot control plays the end-stop buzz once per gesture, so the user knows nothing will change. |
 | FR-16 | While the Mac is in use, Manopola keeps the Dial out of its idle sleep, so the first turn is not lost to the reconnect. On by default; can be turned off in Settings (§7.14). |
+| FR-17 | Using the Dial counts as user activity, as using the mouse does: a touch or turn wakes a sleeping display, and the screen saver does not start while the Dial is in use (§7.15). |
 | FR-18 | The menu shows the Dial's battery level, read from the Bluetooth Battery Service (§7.10). |
 | FR-19 | Planned (M6, M7). The menu lists the connected output and input devices; the default output and the default input are shown in bold, Bluetooth devices show their battery level, and clicking a device makes it the default (§7.11, §7.12). |
 | FR-20 | Planned (M6). The menu shows the current default input device between the output and volume lines (§5.3). |
@@ -185,7 +186,7 @@ Quit Manopola                ⌘Q
 
 The Input line reads "Input: None" without an input device and appends "(kept)" when the default input is the kept device (§7.13). Device items are commands, so they use the regular menu font and label color; details in §7.11.
 
-The three status lines use the menu font at the small system size and the secondary label color, so they read as information rather than commands; their text is always set through `attributedTitle`. The battery part appears only while the level is known (§7.10). The menu is built once. `NSMenuDelegate.menuNeedsUpdate(_:)` refreshes titles and states right before display. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
+The three status lines use the menu font at the small system size and the secondary label color, so they read as information rather than commands; their text is always set through `attributedTitle`. The battery part appears only while the level is known (§7.10). The menu is built once. Titles and states are set on every state change, so they stay current while the menu is open, for example while the Dial turns. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
 
 ### 5.4 Volume Overlay
 
@@ -209,7 +210,7 @@ Source: [`diagrams/class-overview.puml`](diagrams/class-overview.puml)
 | **Control** | `DialController` is the gesture recognizer and the only place that decides what a Dial event does. It depends on two protocols (`AudioControlling`, `HapticFeedback`) so it can be unit-tested without hardware. `VolumeStepper` holds the step math. |
 | **Audio** | `AudioOutput` wraps Core Audio for the default output device: read and write volume and mute, observe device and property changes, publish `AudioState`. |
 | **UI** | `StatusItemController` (NSStatusItem and menu), `VolumeOverlay` (HUD panel), `SettingsWindowController` (preferences window). |
-| **Support** | `Settings` (typed `UserDefaults` wrapper), `LoginItem` (`SMAppService.mainApp`), `Log` (`os.Logger` categories). |
+| **Support** | `Settings` (typed `UserDefaults` wrapper), `LoginItem` (`SMAppService.mainApp`), `Log` (`os.Logger` categories), `UserActivity` (declares Dial use to power management, §7.15). |
 
 Data flows one way: **DialDevice → DialController → AudioOutput → (Core Audio listener) → AudioOutput.onChange → StatusItemController**. The only reverse paths are haptic commands from `DialController` back to `DialDevice` and `onAdjusted` to the overlay.
 
@@ -430,6 +431,8 @@ struct AudioState: Equatable {
     var isMuted: Bool
     var canSetVolume: Bool
     var hasHardwareMute: Bool
+    var isSoftwareVolume = false
+    var isInUseElsewhere = false   // the device undid the last write (see "Rejected writes")
 }
 
 final class AudioOutput: AudioControlling {   // conformance added in M3 with the protocol
@@ -461,6 +464,13 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 **Writes** update the cached state immediately (optimistic) so `DialController` and the overlay see the new value without waiting for the listener round-trip; the listener then confirms or corrects it. Core Audio reads a written volume back with float noise (0.58 as 0.58000004); a re-read that differs from the cached volume of the same device by less than 0.0001 keeps the cached value, so it does not fire `onChange` a second time.
 
+**Rejected writes.** AirPods that are connected to the Mac while another Apple device, such as an iPhone playing a podcast, owns their audio still appear in Core Audio as alive, with settable volume and mute. Every volume write goes out as an AVRCP absolute volume and is undone: the old value comes back 5 to 17 ms later, so the Dial flickered between 49 % and 51 % (observed 2026-10-19). Core Audio and the public Bluetooth API have no property for this ownership; it lives in Apple's private audio arbitration between the devices. Manopola therefore detects the undo (decided with the developer 2026-10-19):
+
+- `VolumeWriteCheck` (pure struct, `Audio/VolumeWriteCheck.swift`) watches every hardware volume write. If, within 250 ms of the last write, the device reports the volume from before the first write of that window again, the write was rejected. The echo of the write itself may arrive first and does not count. A window in which the write stood clears the rejection, and so does a change from elsewhere to a volume other than the one the device returns to.
+- `AudioState.isInUseElsewhere` publishes the rejection. The menu bar icon is dimmed, the menu shows "Volume: in use by another device", the overlay shows "Other Device", and `DialController` plays the debounced end-stop buzz (FR-15).
+- While rejected, `setVolume` still writes, at most once per second, as a probe, and does not publish it. When the Mac gets the device back, the next probe stands and the Dial works again without any other signal.
+- The check is reset when the default output changes. Software volume writes are not checked, because they never reach the device. Mute writes are not checked either; whether AirPods also undo them is not yet observed.
+
 **Shared property access.** The Core Audio property helpers live in `CoreAudioProperty` (caseless enum): default output device, device list, output stream presence, hidden flag, transport type, UID and name strings, settability, volume and mute read and write, and the shared `ListenerBlock` type. `AudioOutput` and `AudioDeviceList` both use it.
 
 **Device list.** `AudioDeviceList` lists the visible devices that have output streams as `AudioDeviceInfo` (UID, name, transport, `canSetVolume`, `hasHardwareMute`, computed `isControllable`) plus the default output UID. It listens to `kAudioHardwarePropertyDevices` and the default output device on the system object and reloads on any change. Only the Devices tab owns one, started in `viewWillAppear()` and stopped in `viewDidDisappear()`, so no listener stays registered while the tab is closed.
@@ -469,7 +479,7 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 ### 7.5 StatusItemController and VolumeOverlay
 
-- `StatusItemController` creates an `NSStatusItem` with `squareLength`, sets the menu from §5.3 and implements `NSMenuDelegate`. `update(audio:dial:)` changes the button image, `appearsDisabled` and the Dial status line (so a retry result shows while the menu is open); the other menu titles are refreshed in `menuNeedsUpdate(_:)`. `menuWillOpen(_:)` calls `onMenuWillOpen`, which `AppDelegate` uses for `DialDevice.retryIfInUseElsewhere()`.
+- `StatusItemController` creates an `NSStatusItem` with `squareLength`, sets the menu from §5.3 and implements `NSMenuDelegate`. `update(audio:dial:isOutputEnabled:)` changes the button image, `appearsDisabled` and every menu title and state, so the volume follows the Dial and a retry result shows while the menu is open. The HID manager and the Core Audio listeners deliver during menu tracking (common run loop modes and the main queue). `menuWillOpen(_:)` calls `onMenuWillOpen`, which `AppDelegate` uses for `DialDevice.retryIfInUseElsewhere()`.
 - Images: `VolumePresentation.knobImage(for:style:size:accessibilityDescription:)` maps the audio state to a `KnobIcon` template image (§5.2); `StatusItemController.iconStyle` and `VolumeOverlay.iconStyle` are set by `AppDelegate` from `Settings.iconStyle`. Accessibility description states volume and mute, e.g. "Volume 42 %, muted", plus ", Surface Dial not connected" when applicable. Percentage text ("42 %") and accessibility text also live in `VolumePresentation`, shared by the status item and the overlay.
 - `StatusItemController` reports menu actions through `onToggleMute` and `onOpenSettings`; "Allow Input Monitoring…" and "About Manopola" are handled inside it.
 - `VolumeOverlay.show(_:)` is called from `DialController.onAdjusted` and respects the `showOverlay` setting (checked in `AppDelegate`).
@@ -630,7 +640,7 @@ The Dial sleeps 4 min 57 s after its last report, and macOS needs about 1.6 s to
 
 **When.** `DialKeepAwake` runs a timer only while all three hold: `keepDialAwake` is on (default on, §7.7), the Dial is `.connected`, and the displays are awake. The displays count as the sign that the Mac is in use: they stay on while the user works and while a video plays without input, which is when the volume matters most, and they sleep when the user leaves. `NSWorkspace.screensDidSleepNotification` and `screensDidWakeNotification` pause and resume the timer. Once the displays sleep, the Dial sleeps about 5 minutes later and nothing ticks until the user returns (NFR-2).
 
-**Interval.** 3 minutes. macOS delayed the spike's 4-minute timer by 15 s because the app runs in the background, so the interval keeps a wide margin below the 4 min 57 s timeout. The first report goes out one interval after the timer starts, not immediately: the Dial has just connected or been in use, and an immediate Stop trigger would cut the ready click short.
+**Interval.** 3 minutes. macOS delayed the spike's 4-minute timer by 15 s because the app runs in the background, so the interval keeps a wide margin below the 4 min 57 s timeout. The first report goes out one interval after the timer starts, not immediately: the Dial has just connected or been in use, and an immediate Stop trigger would cut the ready click short. The exception is a Dial already awake at launch: it gets no ready click (§10), and how long it has been idle is unknown, so `AppDelegate` calls `DialKeepAwake.sendNow()` on that first connection. Without it, a Dial idle for more than about 1 min 45 s before the launch fell asleep before the first report (observed 2026-10-19 after a restart at 10:44:20, asleep at 10:46:48). Measured in the release build 2026-10-19: the reports arrive every 3 min 12 s, and the Dial stayed connected past its 4 min 57 s timeout.
 
 | Situation | Behavior |
 |---|---|
@@ -638,7 +648,30 @@ The Dial sleeps 4 min 57 s after its last report, and macOS needs about 1.6 s to
 | Displays sleep | timer stops; the Dial sleeps about 5 minutes later |
 | Displays wake | timer restarts; if the Dial slept meanwhile, it stays asleep until it is touched |
 | Mac sleeps | the Dial disconnects, which stops the timer; it restarts on the next connection |
+| Manopola launches while the Dial is awake | one report right away, then the timer as usual |
 | A haptic plays at the moment of a report | the Stop trigger can cut it short, at most once every 3 minutes |
+
+**Screen saver (open).** With the screen saver used on the developer's Mac, `coreaudiod` holds display sleep off while it runs, so the displays never sleep and keep-awake ran for 15 minutes while the user was away (2026-10-19). Decided with the developer 2026-10-19: no change for now; whether the extra battery use matters is decided after FR-17 has been in use for a while.
+
+### 7.15 User Activity
+
+Moving the mouse wakes the display and delays the screen saver; using the Dial did neither. Manopola seizes the Dial (§7.2), so its reports never reach the HID event system, and macOS did not know the user was there (FR-17).
+
+**Trigger.** `DialDevice.onActivity` fires for every parsed report ID 1 report, a touch without turning included (decided with the developer 2026-10-19: a hand on the Dial counts like a hand on the mouse). Vendor report 50 and unrecognized reports do not count. `AppDelegate` passes it to `UserActivity.declare()`, which acts at most once per second, because a fast spin sends about 50 reports per second.
+
+**Two assertions, both public `IOPMLib` API.**
+
+- `IOPMAssertionDeclareUserActivity` with `kIOPMUserActiveLocal`, reusing the returned ID: powerd turns a sleeping display on and restarts its display sleep timer. Verified 2026-10-19: the display was on 39 ms after the first declaration.
+- A `PreventUserIdleDisplaySleep` assertion with a 300 s timeout and `kIOPMAssertionTimeoutActionTurnOff`, re-armed on every declaration by setting `kIOPMAssertionTimeoutKey` again. Needed because declared activity does not reset `HIDIdleTime`, the idle time loginwindow uses to start the screen saver (measured 2026-10-19: it kept counting through two declarations); loginwindow does not start the screen saver while display sleep is blocked. The timeout matches the macOS default screen saver delay, so the screen saver starts about 5 minutes after the last Dial use, as after the last mouse use. powerd ends the hold itself, so no timer runs in the app (NFR-2). Re-arming after the timeout and extending before it were verified with a test script on 2026-10-19. loginwindow re-checks one screen saver delay after a blocked check, so the screen saver starts up to one delay after the hold ends (checklist item 20).
+
+**Limits.**
+
+| Situation | Behavior |
+|---|---|
+| Screen saver already running | turning the Dial does not stop it (verified 2026-10-19). Stopping it needs synthetic HID events, which need Accessibility permission, or a private loginwindow call; both rejected with the developer |
+| Screen saver delay other than 5 minutes | after Dial use the screen saver starts at the later of 5 minutes after the last Dial use and the configured delay after the last keyboard or mouse input |
+| Dial asleep | the touch that wakes it is lost (§2.1); the display wakes with the first report after the reconnect, about 1.6 s later |
+| Mac in system sleep | the Dial disconnects (§10); whether a Bluetooth device may wake the Mac is up to macOS |
 
 ## 8. Concurrency Model
 
@@ -672,8 +705,11 @@ Whether macOS requires Input Monitoring for opening a non-keyboard, non-pointer 
 | Situation | Behavior |
 |---|---|
 | Dial not paired / switched off | icon dimmed, menu says "Not Connected"; HID manager stays open and matches it when it appears |
-| Dial idle sleep and wake-up | removal and matching callbacks fire; haptic configuration re-sent on match and after ≥ 15 s silence; with keep-awake on, sleep happens only after the displays sleep (§7.14) |
+| Dial idle sleep and wake-up | removal and matching callbacks fire; haptic configuration re-sent on match and after ≥ 15 s silence; ready click on the connection; with keep-awake on, sleep happens only after the displays sleep (§7.14) |
+| Dial asleep when Manopola launches | cannot be woken by the app (§2.1); "Not Connected" until the user touches it, then the ready click. A Dial already awake at launch (`DialDevice.isPresent` right after `start()`) connects without a click |
 | Mac sleeps and wakes | HID session rebuilt 1 s after `didWakeNotification` |
+| AirPods owned by another device are the default output | volume writes are undone within 17 ms; detected as rejected writes, icon dimmed, buzz on turn, probe once per second (§7.4) |
+| Dial used while the display sleeps or the screen saver runs | the display wakes; a running screen saver keeps running (§7.15) |
 | Button held while Dial disconnects | `reset()`; no mute toggle |
 | Default output changes mid-turn | next detent applies to the new device |
 | Output without software volume | rotation ignored, icon disabled, menu shows "Volume: not adjustable" |
@@ -716,13 +752,15 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 |---|---|
 | `DialReportTests` | parsing both buffer shapes; clockwise `01 00 01 00 …` → +1; counter-clockwise `01 00 FF FF …` → −1; pressed `01 01 00 00 …`; wrong ID or length → `nil`; exact bytes of the feature report (36 detents, haptics on → `01 24 00 00 03 00 00 00`) and of the three manual patterns in §7.1 |
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
-| `DialKeepAwakeTests` | the timer runs only while enabled, connected and displays awake; `stop()` ends it; reports are sent after each interval, not at start |
+| `VolumeWriteCheckTests` | an accepted write, a snap-back after the echo, a fast spin returning to the volume before the first write, a probe that clears or keeps the rejection, a change from elsewhere |
+| `UserActivityTests` | declares at most once per interval, again after it, and keeps declaring after a failure |
+| `DialKeepAwakeTests` | the timer runs only while enabled, connected and displays awake; `stop()` ends it; reports are sent after each interval, not at start; `sendNow()` sends only while the timer runs |
 | `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
 | `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
 | `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |
 | `StatusItemTitleTests` | Dial status line for each connection state, with and without a battery level |
-| `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture |
+| `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture; rotation on an output owned by another device probes and buzzes once per gesture |
 
 `DialDevice`, `AudioOutput` and the UI are thin adapters over system frameworks and are covered by the manual checklist.
 
@@ -746,6 +784,9 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 16. Planned (M7): AirPods show left, right and case levels in both sections; a Bluetooth headset without a reported battery shows none; levels match System Settings.
 17. Planned (M8): keep the M2, join a call that uses the system default microphone, connect AirPods: output moves to the AirPods, input returns to the M2, the call keeps working. Unplug and replug the M2: input returns to it. Keep off: macOS behavior is back.
 18. Keep-awake on: work on the Mac without touching the Dial for 15 minutes, then turn it: the first detent changes the volume, no ready click. Let the displays sleep: the Dial disconnects about 5 minutes later.
+19. Quit Manopola and leave the Dial untouched until it sleeps, then launch Manopola: the menu says Not Connected; touch the Dial: ready click, then turning works. Launch with the Dial awake: no click. Passed 2026-10-19 on the release build: the developer felt the ready click after touching a Dial asleep at launch; with the Dial awake at launch the debug log shows no trigger, only the configuration and an immediate keep-alive.
+20. Turn the display off with Ctrl+Shift+Power, then turn the Dial: the display turns on. Use only the Dial for 6 minutes: the screen saver does not start; it starts about 5 minutes after the last turn. Passed 2026-10-19: display wake, and with the screen saver delay set to 60 s for the test, loginwindow logged "PMDisplaySleepIsBlocked IS blocked … Surface Dial in use" and did not start the screen saver at 105, 165, 225 and 285 s of keyboard and trackpad idle; it started 37 s after the hold timed out, 5 min 37 s after the last turn.
+21. Play audio on the iPhone through AirPods that are also connected to the Mac, select the AirPods as the Mac output and turn the Dial: buzz, icon dimmed, menu "Volume: in use by another device", no flicker. Play audio on the Mac so the AirPods move to it, then turn: the volume changes within about a second. Passed 2026-10-19: rejection detected at 13:00:56 on the first turn; after the AirPods moved to the Mac, the probe at 13:01:22.684 stood and the rejection cleared 258 ms later.
 
 ## 12. Project Structure and Build
 
@@ -766,12 +807,12 @@ Manopola/
 │   ├── Control/                   DialController.swift, VolumeStepper.swift
 │   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift,
 │   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift,
-│   │                              SoftwareVolume.swift, SoftwareGain.swift
+│   │                              SoftwareVolume.swift, SoftwareGain.swift, VolumeWriteCheck.swift
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
 │   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
 │   │                              DeviceSettingsViewController.swift, VolumePresentation.swift,
 │   │                              KnobIcon.swift
-│   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift
+│   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift, UserActivity.swift
 │   └── Resources/                 Assets.xcassets
 └── Tests/ManopolaTests/           Swift Testing suites (from M2)
 ```
@@ -817,7 +858,7 @@ M8 depends only on the input list and the default device write from M6, so it ca
 | R5 | Haptic configuration lost after Dial idle sleep | re-send policy in §7.2 |
 | R6 | Hardware is discontinued | buy a second used unit as a spare once M3 works |
 | R7 | Software volume adds latency for DAWs and depends on a permission | opt-in per device; checkpoint S2, S3, S7, S8 (§7.9); per-app bypass if recording timing suffers |
-| R8 | Dial wake-up is slow after its 5-minute sleep | Keep-awake spike 2026-10-18: reading feature report 1, re-sending the haptic configuration and a Stop trigger together every 4 minutes kept the link up through a 12-minute idle period (14:24:15 to 14:36:24) that would otherwise have ended in sleep at 14:29:12. The debug-only timer fired every 4 min 15 s, because macOS delays timers of background apps. A ready click on every reconnection after the first tells the user when the Dial is usable. **Decided 2026-10-19:** keep-awake ships on by default while the displays are awake, sends all three reports every 3 minutes, and the spike code is removed (§7.14, FR-16). Which report is responsible is still open; narrowing it down needs a temporary build that sends one report at a time. Checklist item 18 not yet run on hardware |
+| R8 | Dial wake-up is slow after its 5-minute sleep | Keep-awake spike 2026-10-18: reading feature report 1, re-sending the haptic configuration and a Stop trigger together every 4 minutes kept the link up through a 12-minute idle period (14:24:15 to 14:36:24) that would otherwise have ended in sleep at 14:29:12. The debug-only timer fired every 4 min 15 s, because macOS delays timers of background apps. A ready click on every connection, except one to a Dial already awake at launch, tells the user when the Dial is usable. **Decided 2026-10-19:** keep-awake ships on by default while the displays are awake, sends all three reports every 3 minutes, and the spike code is removed (§7.14, FR-16). Which report is responsible is still open; narrowing it down needs a temporary build that sends one report at a time. Checklist item 18 not yet run on hardware |
 | R9 | `IOPSCopyPowerSourcesByType` has no header and may change or vanish in a macOS update | looked up with `dlsym`; a missing symbol or unknown keys only hide the battery text (§7.12); re-check after every major macOS release |
 | R10 | Does every Bluetooth audio device UID in Core Audio carry the Bluetooth address that IOPS reports as `Accessory Identifier`? | M7 logs both for AirPods and a non-Apple headset; if a UID lacks the address, the matching rule is decided then |
 | R11 | Between the macOS switch and Manopola's revert, a call app recording from the system default may open the AirPods microphone, which switches them to the call profile and can glitch the call; another tool that enforces a different input would make both switch back and forth | M8 checks Zoom, Teams and Meet set to the system default; apps with an explicitly chosen microphone are not affected. A guard against switching back and forth is added only if the log shows it |

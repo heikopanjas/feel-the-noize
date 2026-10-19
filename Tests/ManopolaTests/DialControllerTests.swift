@@ -20,6 +20,8 @@ struct DialControllerTests {
 
         func setVolume(_ volume: Float32) {
             volumeWrites.append(volume)
+            // Like AudioOutput, a probe on an output owned by another device does not change the state.
+            guard state?.isInUseElsewhere != true else { return }
             state?.volume = volume
         }
 
@@ -163,6 +165,19 @@ struct DialControllerTests {
         fixture.clock.advance(by: .milliseconds(300))
         fixture.controller.handle(.rotated(detents: -1))
         #expect(fixture.haptics.endStops == 2)
+    }
+
+    @Test func turningAnOutputOwnedElsewhereProbesAndBuzzesOncePerGesture() {
+        let audio = FakeAudio(volume: 0.50)
+        audio.state?.isInUseElsewhere = true
+        let fixture = Fixture(audio: audio)
+        for _ in 0 ..< 5 {
+            fixture.controller.handle(.rotated(detents: 1))
+            fixture.clock.advance(by: .milliseconds(100))
+        }
+        #expect(fixture.audio.volumeWrites.count == 5)
+        #expect(abs(fixture.volume() - 0.50) < Self.tolerance)
+        #expect(fixture.haptics.endStops == 1)
     }
 
     @Test func pressStillTogglesHardwareMuteWithoutVolumeControl() {

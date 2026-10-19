@@ -50,6 +50,13 @@ final class DialKeepAwake {
         }
     }
 
+    /// Sends one report right away, only while the timer runs. A Dial that was already awake at launch may have been idle
+    /// for minutes, so its first report cannot wait a full interval.
+    func sendNow() {
+        guard isRunning else { return }
+        send()
+    }
+
     func stop() {
         for observer in observers {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
@@ -72,7 +79,7 @@ final class DialKeepAwake {
         }
         Log.dial.info("Keep-awake running")
         // The first report waits a full interval: the Dial has just connected or been in use, and an immediate Stop
-        // trigger would cut the ready click short.
+        // trigger would cut the ready click short. A Dial awake at launch gets its first report through sendNow().
         task = Task { [weak self, interval] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: interval)

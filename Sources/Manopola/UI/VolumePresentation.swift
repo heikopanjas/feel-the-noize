@@ -24,6 +24,7 @@ enum VolumePresentation {
     static func accessibilityDescription(for state: AudioState?) -> String {
         guard let state else { return "No output device" }
         guard state.canSetVolume else { return state.isMuted ? "Volume not adjustable, muted" : "Volume not adjustable" }
+        guard !state.isInUseElsewhere else { return "Volume in use by another device" }
         return state.isMuted ? "Volume \(percent(state.volume)), muted" : "Volume \(percent(state.volume))"
     }
 }
