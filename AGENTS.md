@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-10-19
+**Last updated:** 2026-10-20
 
 ## Mission Statement
 
@@ -159,3 +159,7 @@ Semantic versioning via `MARKETING_VERSION` in `project.yml`; bump `CURRENT_PROJ
 - Fixed: AirPods connected to the Mac while an iPhone owned their audio made the Dial flicker between 49 and 51 percent, because the AirPods undo every volume write. `VolumeWriteCheck` detects a write that snaps back within 250 ms and sets `AudioState.isInUseElsewhere`: icon dimmed, menu and overlay say so, the Dial buzzes, and a probe write once per second notices when the Mac has the AirPods back. Reason: chosen by the developer; Core Audio and public Bluetooth API expose no audio ownership.
 - Checklist item 21 passed on hardware: the rejection was detected on the first turn while the iPhone owned the AirPods, and cleared with the first probe after they moved to the Mac.
 - Checklist item 20 passed on hardware: with a 60 s screen saver delay, loginwindow refused four times because of the Dial hold and started the screen saver 37 s after the hold timed out. Earlier attempts were invalid because the trackpad was touched or the Dial was not turned during the wait.
+
+### 2026-10-20
+
+- Checklist item 18 marked as passed provisionally by the developer, from the logs of 2026-10-19 rather than a dedicated run: the Dial stayed connected for over 4 hours and the first turn after 17 idle minutes worked without a reconnect. The disconnect after display sleep is still unobserved, because the screen saver kept the displays on.
