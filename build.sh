@@ -17,8 +17,9 @@ ZIP="$DIST/FeelTheNoize-$VERSION.zip"
 # Release-only signing, passed on the command line; project.yml keeps automatic development signing.
 TEAM_ID=${TEAM_ID:-8J2G689FCZ}
 DEVELOPER_ID=${DEVELOPER_ID:-"Developer ID Application: Heiko Panjas ($TEAM_ID)"}
-# Create once with: xcrun notarytool store-credentials feelthenoize-notary --apple-id <id> --team-id 8J2G689FCZ
-NOTARY_PROFILE=${NOTARY_PROFILE:-feelthenoize-notary}
+# Shared by all Developer ID apps of the team. Create once with an App Store Connect API key:
+# xcrun notarytool store-credentials developer-id-notary --key AuthKey_<id>.p8 --key-id <id> --issuer <uuid>
+NOTARY_PROFILE=${NOTARY_PROFILE:-developer-id-notary}
 
 usage() {
     cat <<EOF
@@ -44,10 +45,11 @@ xcb() {
     xcodebuild -scheme "$SCHEME" -destination 'platform=macOS' "$@" | xcbeautify
 }
 
+# Zips the given app to $ZIP.
 zip_app() {
     mkdir -p "$DIST"
     rm -f "$ZIP"
-    ditto -c -k --keepParent "$APP_RELEASE" "$ZIP"
+    ditto -c -k --keepParent "$1" "$ZIP"
 }
 
 cmd_gen() {
@@ -101,15 +103,27 @@ cmd_release() {
         echo "get-task-allow entitlement present, notarization would fail" >&2
         exit 1
     fi
-    zip_app
+    zip_app "$APP_RELEASE"
 }
 
-# Uploads to Apple's notary service, staples the ticket, and re-zips the stapled app.
+# Uploads $ZIP to Apple's notary service, staples the ticket to the app inside it, and re-zips the stapled app.
+# Staples a copy unpacked from the zip, not $APP_RELEASE: the ticket belongs to the submitted build, and the
+# release app may have been moved or rebuilt since `release`.
 cmd_notarize() {
+    if [ ! -f "$ZIP" ]; then
+        echo "$ZIP not found, run ./build.sh release first" >&2
+        exit 1
+    fi
     xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
-    xcrun stapler staple "$APP_RELEASE"
-    spctl --assess --type execute --verbose=2 "$APP_RELEASE"
-    zip_app
+    STAGING=$(mktemp -d)
+    trap 'rm -rf "$STAGING"' EXIT
+    ditto -x -k "$ZIP" "$STAGING"
+    local app="$STAGING/$APP_NAME.app"
+    xcrun stapler staple "$app"
+    xcrun stapler validate "$app"
+    spctl --assess --type execute --verbose=2 "$app"
+    codesign --verify --strict --deep --verbose=2 "$app"
+    zip_app "$app"
 }
 
 cmd_clean() {
