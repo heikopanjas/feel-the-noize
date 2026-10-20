@@ -1,5 +1,5 @@
-// Renders the Manopola app icon into an AppIcon.appiconset directory.
-// Usage: swift scripts/render-icon.swift Sources/Manopola/Resources/Assets.xcassets/AppIcon.appiconset
+// Renders the Feel the Noize app icon into an AppIcon.appiconset directory.
+// Usage: swift scripts/render-icon.swift Sources/FeelTheNoize/Resources/Assets.xcassets/AppIcon.appiconset
 import AppKit
 import CoreGraphics
 

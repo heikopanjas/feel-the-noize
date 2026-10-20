@@ -37,7 +37,7 @@ final class DialBattery: NSObject {
 
     func dialDisconnected() {
         isDialConnected = false
-        // Only drops Manopola's use of the link; the system keeps its own HID connection.
+        // Only drops Feel the Noize's use of the link; the system keeps its own HID connection.
         if let central, let peripheral {
             central.cancelPeripheralConnection(peripheral)
         }

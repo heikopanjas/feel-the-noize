@@ -2,7 +2,7 @@ import AppKit
 
 /// On-screen volume display for Dial-initiated changes (docs/DESIGN.md §5.4).
 ///
-/// Core Audio writes do not show the system volume HUD, so Manopola shows its own. Keyboard changes keep the system HUD,
+/// Core Audio writes do not show the system volume HUD, so Feel the Noize shows its own. Keyboard changes keep the system HUD,
 /// which is why this overlay is never shown for them.
 final class VolumeOverlay {
     private static let size = NSSize(width: 200, height: 200)

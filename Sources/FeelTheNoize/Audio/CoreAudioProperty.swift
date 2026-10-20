@@ -2,7 +2,7 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 
-/// Typed access to the Core Audio properties Manopola reads and writes, shared by `AudioOutput` and `AudioDeviceList`.
+/// Typed access to the Core Audio properties Feel the Noize reads and writes, shared by `AudioOutput` and `AudioDeviceList`.
 enum CoreAudioProperty {
     /// Core Audio identifies a listener by the block pointer, so each block is stored as an Objective-C block once and
     /// the same instance is passed to both add and remove.
@@ -122,7 +122,7 @@ enum CoreAudioProperty {
 
     // MARK: - Software Volume
 
-    /// The Core Audio process object of Manopola itself, so a tap can leave its own audio out.
+    /// The Core Audio process object of Feel the Noize itself, so a tap can leave its own audio out.
     static func readOwnProcessObject() throws -> AudioObjectID {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject, mScope: kAudioObjectPropertyScopeGlobal,

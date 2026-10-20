@@ -1,7 +1,7 @@
 @startuml class-overview
 !include visio2003.iuml
 
-title Manopola - Class Overview
+title Feel the Noize - Class Overview
 
 package "App" {
     class AppDelegate {

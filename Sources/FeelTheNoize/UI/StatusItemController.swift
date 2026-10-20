@@ -88,9 +88,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings(_:)), keyEquivalent: ",")
         settingsItem.target = self
-        let aboutItem = NSMenuItem(title: "About Manopola", action: #selector(showAbout(_:)), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: "About Feel the Noize", action: #selector(showAbout(_:)), keyEquivalent: "")
         aboutItem.target = self
-        let quitItem = NSMenuItem(title: "Quit Manopola", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit Feel the Noize", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for item in [
             dialItem, accessItem, outputItem, volumeItem, .separator(), muteItem, .separator(), settingsItem, aboutItem, .separator(), quitItem

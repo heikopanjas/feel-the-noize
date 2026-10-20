@@ -1,6 +1,6 @@
 import AppKit
 
-/// Draws the knob that stands for Manopola in the menu bar and the overlay (docs/DESIGN.md §5.2), so it cannot be confused
+/// Draws the knob that stands for Feel the Noize in the menu bar and the overlay (docs/DESIGN.md §5.2), so it cannot be confused
 /// with the speaker of the system Sound item. Images are vector template images: they stay sharp at any size and macOS
 /// tints them for light and dark mode; the unlit parts use partial alpha.
 nonisolated enum KnobIcon {

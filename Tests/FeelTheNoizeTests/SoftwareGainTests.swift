@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Manopola
+@testable import FeelTheNoize
 
 struct SoftwareGainTests {
     @Test func zeroIsSilent() {

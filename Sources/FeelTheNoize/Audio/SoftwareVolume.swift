@@ -8,7 +8,7 @@ import Synchronization
 /// aggregate device made of that tap and the device plays it into the device again, scaled by the gain. The IO block is
 /// the only code in the app that runs off the main actor; it shares the gain through atomics, without locks.
 final class SoftwareVolume {
-    static let aggregateUIDPrefix = "com.panjas.Manopola.software-volume."
+    static let aggregateUIDPrefix = "com.panjas.FeelTheNoize.software-volume."
 
     /// The device being controlled, or `nil` while stopped.
     private(set) var deviceUID: String?
@@ -70,10 +70,10 @@ final class SoftwareVolume {
     private var tapUUID = UUID()
 
     private func createTap(for deviceUID: String) throws {
-        // Leaving Manopola itself out of the tap keeps its own playback into the aggregate from feeding back.
+        // Leaving Feel the Noize itself out of the tap keeps its own playback into the aggregate from feeding back.
         let ownProcess = try CoreAudioProperty.readOwnProcessObject()
         let description = CATapDescription(excludingProcesses: [ownProcess], deviceUID: deviceUID, stream: 0)
-        description.name = "Manopola Software Volume"
+        description.name = "Feel the Noize Software Volume"
         description.isPrivate = true
         // The tapped apps no longer reach the hardware directly; only the scaled copy does.
         description.muteBehavior = .muted
@@ -85,7 +85,7 @@ final class SoftwareVolume {
 
     private func createAggregate(for deviceUID: String) throws {
         let description: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "Manopola Software Volume",
+            kAudioAggregateDeviceNameKey: "Feel the Noize Software Volume",
             kAudioAggregateDeviceUIDKey: Self.aggregateUIDPrefix + UUID().uuidString,
             kAudioAggregateDeviceMainSubDeviceKey: deviceUID,
             kAudioAggregateDeviceIsPrivateKey: true,

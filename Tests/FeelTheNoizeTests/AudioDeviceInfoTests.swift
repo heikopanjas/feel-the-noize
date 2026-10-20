@@ -1,7 +1,7 @@
 import CoreAudio
 import Testing
 
-@testable import Manopola
+@testable import FeelTheNoize
 
 struct AudioDeviceInfoTests {
     @Test(

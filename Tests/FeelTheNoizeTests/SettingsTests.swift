@@ -1,12 +1,12 @@
 import Foundation
 import Testing
 
-@testable import Manopola
+@testable import FeelTheNoize
 
 struct SettingsTests {
     /// Runs the body against a private defaults domain, so nothing touches the app's real preferences.
     private func withSettings(_ body: (Settings, UserDefaults) -> Void) {
-        let suiteName = "com.panjas.ManopolaTests.\(UUID().uuidString)"
+        let suiteName = "com.panjas.FeelTheNoizeTests.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             Issue.record("Could not create a defaults suite")
             return

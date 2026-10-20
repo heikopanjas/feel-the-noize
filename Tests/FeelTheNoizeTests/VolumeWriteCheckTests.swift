@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Manopola
+@testable import FeelTheNoize
 
 struct VolumeWriteCheckTests {
     @Test func acceptedWriteIsNotRejected() {

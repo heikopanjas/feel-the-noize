@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Manopola
+@testable import FeelTheNoize
 
 struct VolumeStepperTests {
     private static let tolerance: Float32 = 0.000_01

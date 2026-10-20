@@ -4,7 +4,7 @@
 
 ## Mission Statement
 
-Manopola (working name) is a macOS menu bar app that turns a Microsoft Surface Dial into a hardware volume knob: turning changes the volume of the default output device, pressing toggles mute, and the Dial's haptic motor clicks on every step.
+Feel the Noize (formerly the working name Manopola) is a macOS menu bar app that turns a Microsoft Surface Dial into a hardware volume knob: turning changes the volume of the default output device, pressing toggles mute, and the Dial's haptic motor clicks on every step.
 
 The full specification is `docs/DESIGN.md`. Read it before writing code; it is the source of truth for architecture, HID report layouts, Core Audio usage, gestures and milestones.
 
@@ -16,7 +16,7 @@ The full specification is `docs/DESIGN.md`. Read it before writing code; it is t
 - **Dependencies:** none (no Swift packages)
 - **Platform:** macOS 15.4+
 - **Build System:** XcodeGen (`project.yml`); the `.xcodeproj` is generated and not committed
-- **Tests:** Swift Testing, target `ManopolaTests` in `Tests/ManopolaTests`, hosted in the app
+- **Tests:** Swift Testing, target `FeelTheNoizeTests` in `Tests/FeelTheNoizeTests`, hosted in the app
 - **Distribution:** Developer ID, notarized, not sandboxed, Hardened Runtime
 - **License:** MIT
 
@@ -44,24 +44,24 @@ Architecture and behavior changes go into `docs/DESIGN.md` as well.
 
 ## Build Commands
 
-The `Makefile` wraps the commands below; prefer `make build`, `make test`, `make lint`, `make diagrams`, `make icon`, `make release` and `make notarize`.
+`build.sh` wraps the commands below; prefer `./build.sh build`, `test`, `lint`, `format`, `diagrams`, `icon`, `release` and `notarize`. Several commands run in order (`./build.sh lint test`); `./build.sh help` lists them. `TEAM_ID`, `DEVELOPER_ID` and `NOTARY_PROFILE` are overridden through the environment.
 
 ```sh
 # Generate the Xcode project (after every change to project.yml or added/removed files)
 xcodegen generate
 
 # Build (debug)
-xcodebuild -scheme Manopola -configuration Debug build | xcbeautify
+xcodebuild -scheme FeelTheNoize -configuration Debug build | xcbeautify
 
 # Test
-xcodebuild -scheme Manopola test | xcbeautify
+xcodebuild -scheme FeelTheNoize test | xcbeautify
 
 # Format and lint (swift-format ships with the Xcode toolchain)
 xcrun swift-format format --in-place --recursive Sources Tests
 xcrun swift-format lint --recursive Sources Tests
 
 # Watch the app log, including raw HID reports
-log stream --style compact --level debug --predicate 'subsystem == "com.panjas.Manopola"'
+log stream --style compact --level debug --predicate 'subsystem == "com.panjas.FeelTheNoize"'
 
 # Render diagrams
 plantuml -tsvg docs/diagrams/*.puml
@@ -75,7 +75,7 @@ plantuml -tsvg docs/diagrams/*.puml
 - Imports ordered alphabetically.
 - Comments explain why, not what. `///` for documentation comments, `// MARK: -` to group sections.
 - Concurrency: everything is main-actor isolated. IOKit and Core Audio callbacks run on the main run loop / main queue and enter the actor with `MainActor.assumeIsolated`. No `@unchecked Sendable`, no locks. The single exception to main-actor isolation is the software volume IO block (`SoftwareVolume`), which runs on the HAL IO thread and shares only the gain through `Synchronization.Atomic` in a `nonisolated final class`; it must not allocate, lock or log. C callbacks resolve the main-actor owner from the context pointer before entering the actor; a non-Sendable CF argument such as `IOHIDDevice` is handed over through a commented `nonisolated(unsafe) let`, the only permitted unsafe opt-out.
-- Logging via `os.Logger(subsystem: "com.panjas.Manopola", category:)` with categories `dial`, `audio`, `control`, `ui`, defined in `Support/Log.swift`. A category is added with the milestone that first uses it.
+- Logging via `os.Logger(subsystem: "com.panjas.FeelTheNoize", category:)` with categories `dial`, `audio`, `control`, `ui`, defined in `Support/Log.swift`. A category is added with the milestone that first uses it.
 - Undeclared system APIs are allowed only where their failure degrades a non-essential feature, looked up with `dlsym` and recorded in `docs/DESIGN.md`. Currently only `IOPSCopyPowerSourcesByType` for battery levels (planned in M7).
 - Milestone spike code that must not ship is wrapped in `#if DEBUG` and named in `docs/DESIGN.md` §13 together with the milestone that removes it.
 - Diagrams are PlantUML in `docs/diagrams/`, styled with the shared `visio2003.iuml` include.
@@ -163,3 +163,9 @@ Semantic versioning via `MARKETING_VERSION` in `project.yml`; bump `CURRENT_PROJ
 ### 2026-10-20
 
 - Checklist item 18 marked as passed provisionally by the developer, from the logs of 2026-10-19 rather than a dedicated run: the Dial stayed connected for over 4 hours and the first turn after 17 idle minutes worked without a reconnect. The disconnect after display sleep is still unobserved, because the screen saver kept the displays on.
+- Version 1.2.0 build 3, chosen by the developer. Reason: 1.1.0 build 2 was distributed before Dial use counted as user activity and before AirPods owned by another device were detected; both are new features. README download name updated to match.
+- App renamed from Manopola to Feel the Noize, chosen by the developer. The app bundle, CFBundleName and display name are `Feel the Noize`; target, scheme, Swift module, Xcode project, folders and the release zip use `FeelTheNoize`, so build paths and identifiers stay free of spaces. The Makefile quotes the app paths. Reason: the space is wanted in the name users see, but not in code and file names.
+- Bundle ID, log subsystem and software volume aggregate prefix changed to `com.panjas.FeelTheNoize`, with no migration from `com.panjas.Manopola`. Reason: chosen by the developer over keeping the old ID or importing the old defaults; settings, launch at login and the Input Monitoring, audio recording and Bluetooth permissions are set up once again.
+- Notary keychain profile renamed to `feelthenoize-notary`; it has to be stored once with `xcrun notarytool store-credentials` before the next `./build.sh notarize`.
+- The test target sets `TEST_HOST` explicitly in `project.yml`. Reason: XcodeGen derives it from the target name, which no longer matches the product name, so `make test` could not find the host app.
+- The `Makefile` is replaced by `build.sh` with the same commands and dependencies (`build` and `test` generate first, `run` builds, `release` tests). Several commands run in order and are all validated before the first runs; overrides come from the environment instead of make variables. Reason: requested by the developer. Bash 3.2 compatible, since that is the shell macOS ships.

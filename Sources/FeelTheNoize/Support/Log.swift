@@ -2,7 +2,7 @@ import OSLog
 
 /// Logger categories from docs/DESIGN.md §7.8.
 enum Log {
-    private static let subsystem = "com.panjas.Manopola"
+    private static let subsystem = "com.panjas.FeelTheNoize"
 
     static let audio = Logger(subsystem: subsystem, category: "audio")
     static let control = Logger(subsystem: subsystem, category: "control")

@@ -10,7 +10,7 @@ struct AudioState: Equatable {
     var isMuted: Bool
     var canSetVolume: Bool
     var hasHardwareMute: Bool
-    /// The volume is Manopola's software gain, because the device has no volume control of its own (§7.9).
+    /// The volume is Feel the Noize's software gain, because the device has no volume control of its own (§7.9).
     var isSoftwareVolume = false
     /// The device undid the last volume change, as AirPods do while another device such as an iPhone owns their audio
     /// (§7.4). Core Audio still reports the volume as settable.
