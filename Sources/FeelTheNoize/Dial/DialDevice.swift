@@ -39,8 +39,8 @@ final class DialDevice: HapticFeedback {
     private var detentsPerRevolution = 36
     private var hapticsEnabled = true
     private var hasRequestedAccess = false
-    private var rebuildTask: Task<Void, Never>?
-    private var buzzStopTask: Task<Void, Never>?
+    private let rebuild = DelayedAction()
+    private let buzzStop = DelayedAction()
     private var wakeObserver: (any NSObjectProtocol)?
 
     func start() {
@@ -50,10 +50,8 @@ final class DialDevice: HapticFeedback {
     }
 
     func stop() {
-        rebuildTask?.cancel()
-        rebuildTask = nil
-        buzzStopTask?.cancel()
-        buzzStopTask = nil
+        rebuild.cancel()
+        buzzStop.cancel()
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
@@ -87,11 +85,8 @@ final class DialDevice: HapticFeedback {
 
     func endStop() {
         playHaptic(.buzz)
-        buzzStopTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.endStopBuzzDuration)
-            guard !Task.isCancelled, let self else { return }
-            buzzStopTask = nil
-            sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
+        buzzStop.schedule(after: Self.endStopBuzzDuration) { [weak self] in
+            self?.sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
         }
     }
 
@@ -107,8 +102,7 @@ final class DialDevice: HapticFeedback {
     /// Calls while disconnected are ignored.
     func playHaptic(_ waveform: HapticWaveform, repeatCount: UInt8 = 0, retriggerMilliseconds: UInt16 = 0) {
         // A new waveform replaces a running buzz, so a pending Stop would only cut the new one short.
-        buzzStopTask?.cancel()
-        buzzStopTask = nil
+        buzzStop.cancel()
         sendTrigger(waveform, repeatCount: repeatCount, retriggerMilliseconds: retriggerMilliseconds)
     }
 
@@ -217,11 +211,8 @@ final class DialDevice: HapticFeedback {
     /// A pending rebuild is cancelled and rescheduled if another trigger arrives.
     private func scheduleRebuild(reason: String) {
         Log.dial.notice("Rebuilding the HID session shortly: \(reason, privacy: .public)")
-        rebuildTask?.cancel()
-        rebuildTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.rebuildDelay)
-            guard !Task.isCancelled, let self else { return }
-            self.rebuildTask = nil
+        rebuild.schedule(after: Self.rebuildDelay) { [weak self] in
+            guard let self else { return }
             self.closeManager()
             self.openManager()
         }

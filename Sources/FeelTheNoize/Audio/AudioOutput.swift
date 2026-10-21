@@ -33,7 +33,7 @@ final class AudioOutput: AudioControlling {
     /// Volumes remembered by emulated mute, keyed by device UID. Kept in memory only.
     private var emulatedMuteVolumes: [String: Float32] = [:]
     private var volumeCheck = VolumeWriteCheck()
-    private var volumeCheckTask: Task<Void, Never>?
+    private let volumeCheckWindow = DelayedAction()
     private var lastProbe: ContinuousClock.Instant?
     /// `onChange` runs synchronously; a listener that refreshed this object from inside it would publish twice.
     private var isPublishing = false
@@ -169,18 +169,15 @@ final class AudioOutput: AudioControlling {
 
     private func checkVolumeWrite(_ volume: Float32, current: Float32) {
         volumeCheck.willWrite(volume, current: current)
-        volumeCheckTask?.cancel()
-        volumeCheckTask = Task { [weak self] in
-            try? await Task.sleep(for: VolumeWriteCheck.window)
-            guard !Task.isCancelled, let self else { return }
+        volumeCheckWindow.schedule(after: VolumeWriteCheck.window) { [weak self] in
+            guard let self else { return }
             volumeCheck.finish()
             refresh()
         }
     }
 
     private func resetVolumeCheck() {
-        volumeCheckTask?.cancel()
-        volumeCheckTask = nil
+        volumeCheckWindow.cancel()
         volumeCheck = VolumeWriteCheck()
         lastProbe = nil
     }

@@ -691,6 +691,7 @@ Moving the mouse wakes the display and delays the screen saver; using the Dial d
 - Core Audio listener blocks are registered on `DispatchQueue.main` and use `MainActor.assumeIsolated` the same way.
 - The callbacks resolve the `DialDevice` from the context pointer before entering the actor; as a main-actor class it is Sendable. The non-Sendable `IOHIDDevice` argument is passed through a `nonisolated(unsafe) let`, which is sound because it never leaves the main thread.
 - The one exception is the software volume IO block (§7.9). It runs on the HAL IO thread, is created in a `nonisolated static` function, and shares only the gain through `Synchronization.Atomic` in a `nonisolated final class` with `let` properties, which is checked `Sendable`.
+- Delays run through `DelayedAction` (`Support/DelayedAction.swift`), a main-actor one-shot timer whose `schedule` replaces the pending action and whose `cancel` drops it: the end-stop Stop trigger and the HID session rebuild (§7.2), the rejected-write window (§7.4) and the overlay fade (§5.4). The repeating keep-awake timer (§7.14) stays a loop in `DialKeepAwake`. Both take their sleep as an injected closure, so the tests drive them without the clock (§11.1).
 - No `@unchecked Sendable`, no locks, no `DispatchQueue.async` hops.
 
 ## 9. Permissions, Signing, Distribution
@@ -768,6 +769,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
 | `VolumeWriteCheckTests` | an accepted write, a snap-back after the echo, a fast spin returning to the volume before the first write, a probe that clears or keeps the rejection, a change from elsewhere |
 | `UserActivityTests` | declares at most once per interval, again after it, and keeps declaring after a failure |
+| `DelayedActionTests` | the action runs once after the delay and not before; scheduling again replaces the pending action; `cancel()` drops it |
 | `DialKeepAwakeTests` | the timer runs only while enabled, connected and displays awake; `stop()` ends it; reports are sent after each interval, not at start, and none after `stop()`, driven by the `ManualSleeper` fixture instead of the clock; `sendNow()` sends only while the timer runs |
 | `AccessoryBatteryTests` | address from Core Audio UIDs and power source identifiers, none from USB UIDs or UUIDs; single cell from the AirPods Max capture; AirPods parts grouped and ordered; sources without address, level or known part skipped; case left out while silent; Dial found by vendor and product ID |
 | `KeepChoicesTests` | keep popup choices: connected inputs sorted by name, an absent kept device as "(not connected)" with its remembered name or its UID |

@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.4, review 1.4: one delayed action helper)
+
+- `Support/DelayedAction.swift` replaces the four hand-rolled "cancel the task, sleep, check cancellation, act" tasks: the end-stop Stop trigger and the HID rebuild in `DialDevice`, the rejected-write window in `AudioOutput` and the overlay fade in `VolumeOverlay`. It takes its sleep as an injected closure like `DialKeepAwake`, and `DelayedActionTests` drive it with `ManualSleeper`, which now keeps every unreleased sleep so a replaced timer can be released too. Reason: `Docs/CODE_REVIEW.md` §2.4; the overlay copy had already drifted (never cleared its task, checked cancellation but not `self`).
+- version bump: 1.2.3 to 1.2.4 (PATCH - internal refactoring)
+
 ### 2026-10-22 (v1.2.3, review 1.3: no refresh from inside AudioOutput.onChange)
 
 - `Settings.rememberDevices` and `rememberInputDevices` no longer call `onChange`: they are bookkeeping, and `AppDelegate` calls the first from inside `AudioOutput.onChange`, which made `Settings.onChange` refresh the audio output and re-enter `publish` while it was still running. Reason: `Docs/CODE_REVIEW.md` §2.3; it worked only because `state` was assigned before the callback.

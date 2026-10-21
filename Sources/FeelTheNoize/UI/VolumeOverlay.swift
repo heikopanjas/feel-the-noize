@@ -15,7 +15,7 @@ final class VolumeOverlay {
     private let levelBar = LevelBar()
     private let label = NSTextField(labelWithString: "")
     private lazy var panel = makePanel()
-    private var hideTask: Task<Void, Never>?
+    private let fade = DelayedAction()
     // Lets a fade that finishes after a new show() leave the panel on screen.
     private var showGeneration = 0
     private static let knobSize: CGFloat = 72
@@ -47,10 +47,7 @@ final class VolumeOverlay {
     // MARK: - Visibility
 
     private func scheduleFadeOut() {
-        hideTask?.cancel()
-        hideTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.visibleDuration)
-            guard !Task.isCancelled else { return }
+        fade.schedule(after: Self.visibleDuration) { [weak self] in
             self?.fadeOut()
         }
     }
