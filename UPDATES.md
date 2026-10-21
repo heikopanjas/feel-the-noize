@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.10, review 3.2: control and support to the Swift skill)
+
+- `DialController`, `Settings`, `UserActivity`, `DialKeepAwake`, `LoginItem` and `Log` rewritten to the swift-coding-conventions skill as in 3.1; `DialController.rotate` splits into `rotate`, `step` and `apply` so every guard is first in its function. No behavior change; `DialControllerTests`, `SettingsTests`, `UserActivityTests` and `DialKeepAwakeTests` pin them. Reason: `Docs/CODE_REVIEW.md` §3.
+- `ControlSettings` (from `Settings.swift`), `AudioControlling` and `HapticFeedback` (from `DialController.swift`) move to their own files.
+- two places keep the type name instead of `Self.`, each with a comment: the closure in `UserActivity`'s convenience init, formed before `self.init`, and the static logger initializers in `Log`.
+- version bump: 1.2.9 to 1.2.10 (PATCH - style refactoring)
+
 ### 2026-10-22 (v1.2.9, review 3.1: pure logic to the Swift skill)
 
 - `VolumeStepper`, `DialReport`, `VolumeWriteCheck`, `SoftwareGain`, `AccessoryBattery`, `AudioDeviceInfo`, `CoreAudioError`, `KnobIcon`, `DeviceIcon`, `BatteryIcon` and `VolumePresentation` rewritten to the swift-coding-conventions skill: explicit `self.` and `Self.`, `== true` / `== false` in conditions, explicit `return`, `-> Void`, one condition per `guard` or `if`, guards only before any other statement, one pattern per `case`, no nested ternary. No behavior change; the unit tests pin every one of these files. Reason: `Docs/CODE_REVIEW.md` §3, decided literal application.

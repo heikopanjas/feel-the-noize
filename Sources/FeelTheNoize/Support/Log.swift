@@ -4,8 +4,9 @@ import OSLog
 enum Log {
     private static let subsystem = "com.panjas.FeelTheNoize"
 
-    static let audio = Logger(subsystem: subsystem, category: "audio")
-    static let control = Logger(subsystem: subsystem, category: "control")
-    static let dial = Logger(subsystem: subsystem, category: "dial")
-    static let ui = Logger(subsystem: subsystem, category: "ui")
+    // The type name rather than `Self`: a static stored property initializer cannot refer to `Self`.
+    static let audio = Logger(subsystem: Log.subsystem, category: "audio")
+    static let control = Logger(subsystem: Log.subsystem, category: "control")
+    static let dial = Logger(subsystem: Log.subsystem, category: "dial")
+    static let ui = Logger(subsystem: Log.subsystem, category: "ui")
 }

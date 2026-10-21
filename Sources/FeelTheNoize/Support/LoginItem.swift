@@ -3,17 +3,21 @@ import ServiceManagement
 /// Launch at login through `SMAppService.mainApp`. Not stored in Settings: the service status is the source of truth.
 enum LoginItem {
     static var status: SMAppService.Status {
-        SMAppService.mainApp.status
+        return SMAppService.mainApp.status
     }
 
     /// Registered counts as enabled even while it waits for approval in System Settings.
     static var isEnabled: Bool {
-        status == .enabled || status == .requiresApproval
+        let status = Self.status
+        if status == .enabled {
+            return true
+        }
+        return status == .requiresApproval
     }
 
-    static func setEnabled(_ enabled: Bool) {
+    static func setEnabled(_ enabled: Bool) -> Void {
         do {
-            if enabled {
+            if enabled == true {
                 try SMAppService.mainApp.register()
             }
             else {
@@ -25,7 +29,7 @@ enum LoginItem {
         }
     }
 
-    static func openSystemSettings() {
+    static func openSystemSettings() -> Void {
         SMAppService.openSystemSettingsLoginItems()
     }
 }

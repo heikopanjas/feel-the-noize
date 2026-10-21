@@ -26,33 +26,48 @@ final class UserActivity {
         var activityID = IOPMAssertionID(kIOPMNullAssertionID)
         // The hold turns off at its timeout but keeps its ID; setting the timeout again re-arms or extends it.
         var holdID = IOPMAssertionID(kIOPMNullAssertionID)
+        // The type name, not `Self`: the closure is formed before `self.init` has run.
         self.init {
             let activity = IOPMAssertionDeclareUserActivity(UserActivity.assertionName, kIOPMUserActiveLocal, &activityID)
-            let hold =
-                holdID == kIOPMNullAssertionID
-                ? IOPMAssertionCreateWithDescription(
+            let hold: IOReturn
+            if holdID == kIOPMNullAssertionID {
+                hold = IOPMAssertionCreateWithDescription(
                     kIOPMAssertPreventUserIdleDisplaySleep as CFString, UserActivity.assertionName, nil, nil, nil,
                     UserActivity.screenSaverHoldSeconds, kIOPMAssertionTimeoutActionTurnOff as CFString, &holdID
                 )
-                : IOPMAssertionSetProperty(holdID, kIOPMAssertionTimeoutKey as CFString, UserActivity.screenSaverHoldSeconds as CFNumber)
-            return activity != kIOReturnSuccess ? activity : hold
+            }
+            else {
+                hold = IOPMAssertionSetProperty(
+                    holdID, kIOPMAssertionTimeoutKey as CFString, UserActivity.screenSaverHoldSeconds as CFNumber)
+            }
+            if activity != kIOReturnSuccess {
+                return activity
+            }
+            return hold
         }
     }
 
     init(minimumInterval: Duration = UserActivity.minimumInterval, declare: @escaping () -> IOReturn) {
         self.minimumInterval = minimumInterval
-        declareActivity = declare
+        self.declareActivity = declare
     }
 
-    func declare() {
+    func declare() -> Void {
         let now = ContinuousClock.now
-        if let lastDeclaration, now - lastDeclaration < minimumInterval {
+        if let lastDeclaration = self.lastDeclaration {
+            if now - lastDeclaration < self.minimumInterval {
+                return
+            }
+        }
+        self.lastDeclaration = now
+        let result = self.declareActivity()
+        if result == kIOReturnSuccess {
             return
         }
-        lastDeclaration = now
-        let result = declareActivity()
-        guard result != kIOReturnSuccess, !hasLoggedFailure else { return }
-        hasLoggedFailure = true
+        if self.hasLoggedFailure == true {
+            return
+        }
+        self.hasLoggedFailure = true
         Log.control.error("Declaring user activity failed: 0x\(String(UInt32(bitPattern: result), radix: 16), privacy: .public)")
     }
 }

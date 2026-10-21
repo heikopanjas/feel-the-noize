@@ -1,13 +1,5 @@
 import Foundation
 
-/// The settings `DialController` reads on every event.
-struct ControlSettings: Equatable {
-    var stepPercent: Int
-    var reverseDirection: Bool
-    /// Output devices the Dial must leave alone, by Core Audio UID.
-    var excludedDeviceUIDs: Set<String> = []
-}
-
 /// Typed wrapper around `UserDefaults` (Docs/DESIGN.md §7.7). Out-of-range stored values fall back to the default.
 final class Settings {
     static let detentChoices = [18, 24, 36, 48, 72]
@@ -41,7 +33,7 @@ final class Settings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        defaults.register(defaults: [
+        self.defaults.register(defaults: [
             Key.detentsPerRevolution: Self.defaultDetents,
             Key.volumeStepPercent: Self.defaultStepPercent,
             Key.reverseDirection: false,
@@ -53,98 +45,140 @@ final class Settings {
     }
 
     var detentsPerRevolution: Int {
-        get { Self.validated(defaults.integer(forKey: Key.detentsPerRevolution), in: Self.detentChoices, fallback: Self.defaultDetents) }
-        set { write(newValue, forKey: Key.detentsPerRevolution) }
+        get {
+            return Self.validated(self.defaults.integer(forKey: Key.detentsPerRevolution), in: Self.detentChoices, fallback: Self.defaultDetents)
+        }
+        set {
+            self.write(newValue, forKey: Key.detentsPerRevolution)
+        }
     }
 
     var volumeStepPercent: Int {
-        get { Self.validated(defaults.integer(forKey: Key.volumeStepPercent), in: Self.stepPercentChoices, fallback: Self.defaultStepPercent) }
-        set { write(newValue, forKey: Key.volumeStepPercent) }
+        get {
+            let stored = self.defaults.integer(forKey: Key.volumeStepPercent)
+            return Self.validated(stored, in: Self.stepPercentChoices, fallback: Self.defaultStepPercent)
+        }
+        set {
+            self.write(newValue, forKey: Key.volumeStepPercent)
+        }
     }
 
     var reverseDirection: Bool {
-        get { defaults.bool(forKey: Key.reverseDirection) }
-        set { write(newValue, forKey: Key.reverseDirection) }
+        get {
+            return self.defaults.bool(forKey: Key.reverseDirection)
+        }
+        set {
+            self.write(newValue, forKey: Key.reverseDirection)
+        }
     }
 
     var hapticDetents: Bool {
-        get { defaults.bool(forKey: Key.hapticDetents) }
-        set { write(newValue, forKey: Key.hapticDetents) }
+        get {
+            return self.defaults.bool(forKey: Key.hapticDetents)
+        }
+        set {
+            self.write(newValue, forKey: Key.hapticDetents)
+        }
     }
 
     var showOverlay: Bool {
-        get { defaults.bool(forKey: Key.showOverlay) }
-        set { write(newValue, forKey: Key.showOverlay) }
+        get {
+            return self.defaults.bool(forKey: Key.showOverlay)
+        }
+        set {
+            self.write(newValue, forKey: Key.showOverlay)
+        }
     }
 
     /// Keeps the Dial out of its idle sleep while the displays are awake (Docs/DESIGN.md §7.14).
     var keepDialAwake: Bool {
-        get { defaults.bool(forKey: Key.keepDialAwake) }
-        set { write(newValue, forKey: Key.keepDialAwake) }
+        get {
+            return self.defaults.bool(forKey: Key.keepDialAwake)
+        }
+        set {
+            self.write(newValue, forKey: Key.keepDialAwake)
+        }
     }
 
     /// The knob drawn in the menu bar and the overlay; unknown stored values fall back to the arc.
     var iconStyle: KnobIcon.Style {
-        get { defaults.string(forKey: Key.iconStyle).flatMap(KnobIcon.Style.init(rawValue:)) ?? .arc }
-        set { write(newValue.rawValue, forKey: Key.iconStyle) }
+        get {
+            return self.defaults.string(forKey: Key.iconStyle).flatMap(KnobIcon.Style.init(rawValue:)) ?? .arc
+        }
+        set {
+            self.write(newValue.rawValue, forKey: Key.iconStyle)
+        }
     }
 
     var controlSettings: ControlSettings {
-        ControlSettings(stepPercent: volumeStepPercent, reverseDirection: reverseDirection, excludedDeviceUIDs: excludedDeviceUIDs)
+        return ControlSettings(
+            stepPercent: self.volumeStepPercent, reverseDirection: self.reverseDirection, excludedDeviceUIDs: self.excludedDeviceUIDs)
     }
 
     // MARK: - Output Devices
 
     /// Stored as exclusions, so devices the app has never seen are enabled and it works out of the box.
     var excludedDeviceUIDs: Set<String> {
-        get { Set(defaults.stringArray(forKey: Key.excludedOutputDevices) ?? []) }
-        set { write(newValue.sorted(), forKey: Key.excludedOutputDevices) }
+        get {
+            return Set(self.defaults.stringArray(forKey: Key.excludedOutputDevices) ?? [])
+        }
+        set {
+            self.write(newValue.sorted(), forKey: Key.excludedOutputDevices)
+        }
     }
 
     func isDeviceEnabled(_ uid: String) -> Bool {
-        !excludedDeviceUIDs.contains(uid)
+        return self.excludedDeviceUIDs.contains(uid) == false
     }
 
-    func setDevice(_ uid: String, enabled: Bool) {
-        var excluded = excludedDeviceUIDs
-        if enabled {
+    func setDevice(_ uid: String, enabled: Bool) -> Void {
+        var excluded = self.excludedDeviceUIDs
+        if enabled == true {
             excluded.remove(uid)
         }
         else {
             excluded.insert(uid)
         }
-        guard excluded != excludedDeviceUIDs else { return }
-        excludedDeviceUIDs = excluded
+        if excluded == self.excludedDeviceUIDs {
+            return
+        }
+        self.excludedDeviceUIDs = excluded
     }
 
     /// Names of every output device seen so far, by UID, so absent devices can still be listed and configured.
     var knownDevices: [String: String] {
-        defaults.dictionary(forKey: Key.knownOutputDevices) as? [String: String] ?? [:]
+        return self.defaults.dictionary(forKey: Key.knownOutputDevices) as? [String: String] ?? [:]
     }
 
     // MARK: - Software Volume
 
     /// Devices without volume control on which the user turned on software volume (Docs/DESIGN.md §7.9).
     var softwareVolumeDeviceUIDs: Set<String> {
-        get { Set(defaults.stringArray(forKey: Key.softwareVolumeDevices) ?? []) }
-        set { write(newValue.sorted(), forKey: Key.softwareVolumeDevices) }
+        get {
+            return Set(self.defaults.stringArray(forKey: Key.softwareVolumeDevices) ?? [])
+        }
+        set {
+            self.write(newValue.sorted(), forKey: Key.softwareVolumeDevices)
+        }
     }
 
-    func setSoftwareVolume(_ uid: String, enabled: Bool) {
-        var uids = softwareVolumeDeviceUIDs
-        if enabled {
+    func setSoftwareVolume(_ uid: String, enabled: Bool) -> Void {
+        var uids = self.softwareVolumeDeviceUIDs
+        if enabled == true {
             uids.insert(uid)
         }
         else {
             uids.remove(uid)
         }
-        guard uids != softwareVolumeDeviceUIDs else { return }
-        softwareVolumeDeviceUIDs = uids
+        if uids == self.softwareVolumeDeviceUIDs {
+            return
+        }
+        self.softwareVolumeDeviceUIDs = uids
     }
 
     /// Writes only when a device or name is new, and never calls `onChange`.
-    func rememberDevices(_ names: [String: String]) {
-        remember(names, known: knownDevices, forKey: Key.knownOutputDevices)
+    func rememberDevices(_ names: [String: String]) -> Void {
+        self.remember(names, known: self.knownDevices, forKey: Key.knownOutputDevices)
     }
 
     // MARK: - Input Devices
@@ -152,36 +186,42 @@ final class Settings {
     /// The input device kept as default while it is connected (Docs/DESIGN.md §7.13); `nil` when the keep is off. Stored as
     /// an empty string for off.
     var keptInputDeviceUID: String? {
-        get { defaults.string(forKey: Key.keptInputDevice).flatMap { $0.isEmpty ? nil : $0 } }
+        get {
+            return self.defaults.string(forKey: Key.keptInputDevice).flatMap { $0.isEmpty == true ? nil : $0 }
+        }
         set {
-            guard newValue != keptInputDeviceUID else { return }
-            write(newValue ?? "", forKey: Key.keptInputDevice)
+            guard newValue != self.keptInputDeviceUID else {
+                return
+            }
+            self.write(newValue ?? "", forKey: Key.keptInputDevice)
         }
     }
 
     /// Names of every input device seen so far, by UID, so a kept device can be named while it is disconnected.
     var knownInputDevices: [String: String] {
-        defaults.dictionary(forKey: Key.knownInputDevices) as? [String: String] ?? [:]
+        return self.defaults.dictionary(forKey: Key.knownInputDevices) as? [String: String] ?? [:]
     }
 
     /// Writes only when a device or name is new, and never calls `onChange`.
-    func rememberInputDevices(_ names: [String: String]) {
-        remember(names, known: knownInputDevices, forKey: Key.knownInputDevices)
+    func rememberInputDevices(_ names: [String: String]) -> Void {
+        self.remember(names, known: self.knownInputDevices, forKey: Key.knownInputDevices)
     }
 
-    private func remember(_ names: [String: String], known: [String: String], forKey key: String) {
+    private func remember(_ names: [String: String], known: [String: String], forKey key: String) -> Void {
         let merged = known.merging(names) { _, new in new }
-        guard merged != known else { return }
-        defaults.set(merged, forKey: key)
+        if merged == known {
+            return
+        }
+        self.defaults.set(merged, forKey: key)
     }
 
-    private func write(_ value: Any, forKey key: String) {
-        defaults.set(value, forKey: key)
-        onChange?()
+    private func write(_ value: Any, forKey key: String) -> Void {
+        self.defaults.set(value, forKey: key)
+        self.onChange?()
     }
 
     private static func validated(_ value: Int, in choices: [Int], fallback: Int) -> Int {
-        choices.contains(value) ? value : fallback
+        return choices.contains(value) == true ? value : fallback
     }
 }
 
@@ -190,19 +230,22 @@ final class Settings {
 extension Settings: SoftwareVolumePreferences {
     /// An excluded device is left alone entirely, software volume included.
     func wantsSoftwareVolume(_ uid: String) -> Bool {
-        softwareVolumeDeviceUIDs.contains(uid) && isDeviceEnabled(uid)
+        guard self.softwareVolumeDeviceUIDs.contains(uid) == true else {
+            return false
+        }
+        return self.isDeviceEnabled(uid)
     }
 
     /// Starts at full level, so turning software volume on changes nothing audible.
     func softwareVolumeLevel(_ uid: String) -> Float {
-        let levels = defaults.dictionary(forKey: Key.softwareVolumeLevels) as? [String: Double] ?? [:]
+        let levels = self.defaults.dictionary(forKey: Key.softwareVolumeLevels) as? [String: Double] ?? [:]
         return Float(min(max(levels[uid] ?? 1, 0), 1))
     }
 
     /// Written on every Dial step, so it bypasses `onChange` to avoid a settings refresh per detent.
-    func setSoftwareVolumeLevel(_ uid: String, _ level: Float) {
-        var levels = defaults.dictionary(forKey: Key.softwareVolumeLevels) as? [String: Double] ?? [:]
+    func setSoftwareVolumeLevel(_ uid: String, _ level: Float) -> Void {
+        var levels = self.defaults.dictionary(forKey: Key.softwareVolumeLevels) as? [String: Double] ?? [:]
         levels[uid] = Double(level)
-        defaults.set(levels, forKey: Key.softwareVolumeLevels)
+        self.defaults.set(levels, forKey: Key.softwareVolumeLevels)
     }
 }

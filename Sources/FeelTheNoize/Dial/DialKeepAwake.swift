@@ -12,19 +12,25 @@ final class DialKeepAwake {
     static let interval: Duration = .seconds(180)
 
     var isEnabled = false {
-        didSet { update() }
+        didSet {
+            self.update()
+        }
     }
 
     var isDialConnected = false {
-        didSet { update() }
+        didSet {
+            self.update()
+        }
     }
 
     var areDisplaysAwake = true {
-        didSet { update() }
+        didSet {
+            self.update()
+        }
     }
 
     var isRunning: Bool {
-        task != nil
+        return self.task != nil
     }
 
     private let interval: Duration
@@ -43,12 +49,14 @@ final class DialKeepAwake {
         self.send = send
     }
 
-    func start() {
-        guard observers.isEmpty else { return }
+    func start() -> Void {
+        guard self.observers.isEmpty == true else {
+            return
+        }
         let center = NSWorkspace.shared.notificationCenter
         let changes = [(NSWorkspace.screensDidSleepNotification, false), (NSWorkspace.screensDidWakeNotification, true)]
-        observers = changes.map { name, isAwake in
-            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+        self.observers = changes.map { name, isAwake in
+            return center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.areDisplaysAwake = isAwake
                 }
@@ -58,39 +66,50 @@ final class DialKeepAwake {
 
     /// Sends one report right away, only while the timer runs. A Dial that was already awake at launch may have been idle
     /// for minutes, so its first report cannot wait a full interval.
-    func sendNow() {
-        guard isRunning else { return }
-        send()
+    func sendNow() -> Void {
+        guard self.isRunning == true else {
+            return
+        }
+        self.send()
     }
 
-    func stop() {
-        for observer in observers {
+    func stop() -> Void {
+        for observer in self.observers {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
-        observers = []
-        task?.cancel()
-        task = nil
+        self.observers = []
+        self.task?.cancel()
+        self.task = nil
     }
 
     // MARK: - Timer
 
-    private func update() {
-        let shouldRun = isEnabled && isDialConnected && areDisplaysAwake
-        guard shouldRun != isRunning else { return }
-        guard shouldRun else {
+    private func update() -> Void {
+        let shouldRun = self.isEnabled == true && self.isDialConnected == true && self.areDisplaysAwake == true
+        if shouldRun == self.isRunning {
+            return
+        }
+        if shouldRun == false {
             Log.dial.info("Keep-awake paused")
-            task?.cancel()
-            task = nil
+            self.task?.cancel()
+            self.task = nil
             return
         }
         Log.dial.info("Keep-awake running")
         // The first report waits a full interval: the Dial has just connected or been in use, and an immediate Stop
         // trigger would cut the ready click short. A Dial awake at launch gets its first report through sendNow().
-        task = Task { [weak self, interval, sleep = self.sleep] in
-            while !Task.isCancelled {
+        self.task = Task { [weak self, interval = self.interval, sleep = self.sleep] in
+            while Task.isCancelled == false {
                 await sleep(interval)
-                guard !Task.isCancelled, let self else { return }
-                send()
+                if Task.isCancelled == true {
+                    return
+                }
+                if let self = self {
+                    self.send()
+                }
+                else {
+                    return
+                }
             }
         }
     }

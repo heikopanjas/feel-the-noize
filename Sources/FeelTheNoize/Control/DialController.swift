@@ -1,14 +1,3 @@
-protocol AudioControlling: AnyObject {
-    var state: AudioState? { get }
-    func setVolume(_ volume: Float32)
-    func setMuted(_ muted: Bool)
-}
-
-protocol HapticFeedback: AnyObject {
-    func endStop()
-    func muteToggled(isMuted: Bool)
-}
-
 /// Gesture recognizer and the only place that decides what a Dial event does (Docs/DESIGN.md §7.3).
 final class DialController {
     private enum Gesture {
@@ -40,86 +29,114 @@ final class DialController {
         self.now = now
     }
 
-    func handle(_ event: DialEvent) {
+    func handle(_ event: DialEvent) -> Void {
         switch event {
             case .rotated(let detents):
-                rotate(by: detents)
+                self.rotate(by: detents)
             case .pressed:
-                gesture = .pressedStill
+                self.gesture = .pressedStill
             case .released:
-                if gesture == .pressedStill {
-                    toggleMute()
+                if self.gesture == .pressedStill {
+                    self.toggleMute()
                 }
-                gesture = .idle
+                self.gesture = .idle
         }
     }
 
     /// Called when the Dial disconnects, so an in-flight press never toggles mute.
-    func reset() {
-        gesture = .idle
+    func reset() -> Void {
+        self.gesture = .idle
     }
 
     // MARK: - Gestures
 
-    private func rotate(by detents: Int) {
-        let isFine = gesture != .idle
+    private func rotate(by detents: Int) -> Void {
+        let isFine = self.gesture != .idle
         // Turning while pressed suppresses the mute toggle on release, even if the volume cannot change.
-        if isFine {
-            gesture = .pressedTurned
+        if isFine == true {
+            self.gesture = .pressedTurned
         }
-        let settings = settings()
-        guard detents != 0, let state = audio.state, !settings.excludedDeviceUIDs.contains(state.deviceUID) else { return }
+        self.step(by: detents, isFine: isFine)
+    }
+
+    private func step(by detents: Int, isFine: Bool) -> Void {
+        guard detents != 0 else {
+            return
+        }
+        guard let state = self.audio.state else {
+            return
+        }
+        let settings = self.settings()
+        if settings.excludedDeviceUIDs.contains(state.deviceUID) == true {
+            return
+        }
         // The device has no volume control and no software volume: buzz so the user knows nothing will change.
-        guard state.canSetVolume else {
-            hitEndStop()
+        if state.canSetVolume == false {
+            self.hitEndStop()
             return
         }
 
-        let detents = settings.reverseDirection ? -detents : detents
+        let signedDetents = settings.reverseDirection == true ? -detents : detents
         var step = Float32(settings.stepPercent) / 100
-        if isFine {
+        if isFine == true {
             step /= Self.fineStepDivisor
         }
 
-        if state.isMuted {
-            audio.setMuted(false)
+        if state.isMuted == true {
+            self.audio.setMuted(false)
         }
         // Unmuting an emulated mute restores the remembered volume, so step from the state after unmuting.
-        let current = audio.state?.volume ?? state.volume
-        let target = VolumeStepper.volume(from: current, detents: detents, step: step)
-        let isAtEnd = detents > 0 ? current >= 1 : current <= 0
-        if target == current, isAtEnd {
-            hitEndStop()
+        let current = self.audio.state?.volume ?? state.volume
+        let target = VolumeStepper.volume(from: current, detents: signedDetents, step: step)
+        self.apply(target: target, from: current, detents: signedDetents)
+
+        if let adjusted = self.audio.state {
+            self.onAdjusted?(adjusted)
         }
-        else {
-            audio.setVolume(target)
-            // Another device owns the output and undid an earlier change: buzz so the user knows nothing changed.
-            if audio.state?.isInUseElsewhere == true {
-                hitEndStop()
+    }
+
+    /// Writes the target, or buzzes when the Dial is already at the end of the range or the device undid the change.
+    private func apply(target: Float32, from current: Float32, detents: Int) -> Void {
+        let isAtEnd = detents > 0 ? current >= 1 : current <= 0
+        if target == current {
+            if isAtEnd == true {
+                self.hitEndStop()
+                return
             }
         }
-
-        if let adjusted = audio.state {
-            onAdjusted?(adjusted)
+        self.audio.setVolume(target)
+        // Another device owns the output and undid an earlier change: buzz so the user knows nothing changed.
+        if self.audio.state?.isInUseElsewhere == true {
+            self.hitEndStop()
         }
     }
 
-    private func toggleMute() {
-        guard let state = audio.state, !settings().excludedDeviceUIDs.contains(state.deviceUID) else { return }
-        let muted = !state.isMuted
-        audio.setMuted(muted)
-        // A device with neither mute nor software volume refuses; then there is nothing to confirm.
-        guard let adjusted = audio.state, adjusted.isMuted == muted else { return }
-        haptics.muteToggled(isMuted: muted)
-        onAdjusted?(adjusted)
-    }
-
-    private func hitEndStop() {
-        let now = now()
-        defer { lastEndStopHit = now }
-        if let lastEndStopHit, now - lastEndStopHit < Self.endStopQuietPeriod {
+    private func toggleMute() -> Void {
+        guard let state = self.audio.state else {
             return
         }
-        haptics.endStop()
+        guard self.settings().excludedDeviceUIDs.contains(state.deviceUID) == false else {
+            return
+        }
+        let muted = state.isMuted == false
+        self.audio.setMuted(muted)
+        // A device with neither mute nor software volume refuses; then there is nothing to confirm.
+        if let adjusted = self.audio.state {
+            if adjusted.isMuted == muted {
+                self.haptics.muteToggled(isMuted: muted)
+                self.onAdjusted?(adjusted)
+            }
+        }
+    }
+
+    private func hitEndStop() -> Void {
+        let now = self.now()
+        defer { self.lastEndStopHit = now }
+        if let lastEndStopHit = self.lastEndStopHit {
+            if now - lastEndStopHit < Self.endStopQuietPeriod {
+                return
+            }
+        }
+        self.haptics.endStop()
     }
 }
