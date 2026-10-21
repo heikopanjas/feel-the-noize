@@ -458,6 +458,8 @@ final class AudioOutput: AudioControlling {   // conformance added in M3 with th
 
 Core Audio identifies a listener by its block pointer. The listener closures are therefore stored once as `@convention(block)` values and the same instances are passed to add and remove.
 
+`refresh()` is the one place with side effects: it reconciles software volume (§7.9), feeds the rejected-write check and resolves the emulated mute around a pure `readState`, then calls `publish`. `onChange` runs synchronously, so nothing it reaches may refresh `AudioOutput` again; `publish` asserts in Debug that it is not re-entered, and `Settings.rememberDevices`, which `AppDelegate` calls from `onChange`, bypasses `Settings.onChange` for that reason (§7.7).
+
 **Writes** update the cached state immediately (optimistic) so `DialController` and the overlay see the new value without waiting for the listener round-trip; the listener then confirms or corrects it. Core Audio reads a written volume back with float noise (0.58 as 0.58000004); a re-read that differs from the cached volume of the same device by less than 0.0001 keeps the cached value, so it does not fire `onChange` a second time.
 
 **Rejected writes.** AirPods that are connected to the Mac while another Apple device, such as an iPhone playing a podcast, owns their audio still appear in Core Audio as alive, with settable volume and mute. Every volume write goes out as an AVRCP absolute volume and is undone: the old value comes back 5 to 17 ms later, so the Dial flickered between 49 % and 51 % (observed 2026-10-19). Core Audio and the public Bluetooth API have no property for this ownership; it lives in Apple's private audio arbitration between the devices. Feel the Noize therefore detects the undo (decided with the developer 2026-10-19):
@@ -514,7 +516,7 @@ Connected devices come first, then remembered devices from `Settings.knownDevice
 
 ### 7.7 Settings and Persistence
 
-`Settings` wraps `UserDefaults.standard`, registers defaults at launch, exposes typed properties and calls `onChange` after every write. `AppDelegate` reacts by calling `dial.configure(...)` when detents or haptics changed.
+`Settings` wraps `UserDefaults.standard`, registers defaults at launch, exposes typed properties and calls `onChange` after every write of a setting. `AppDelegate` reacts by calling `dial.configure(...)` when detents or haptics changed. Two bookkeeping writes bypass `onChange`: the remembered device names, which `AppDelegate` stores from inside `AudioOutput.onChange` and which must not refresh the audio output from its own callback, and the software volume levels, written on every Dial step.
 
 | Key | Type | Default | Valid range |
 |---|---|---|---|
@@ -526,11 +528,11 @@ Connected devices come first, then remembered devices from `Settings.knownDevice
 | `keepDialAwake` | Bool | true | — (§7.14) |
 | `iconStyle` | String | `arc` | `arc`, `ring`, `dots`; others fall back to `arc` |
 | `excludedOutputDevices` | [String] | [] | Core Audio device UIDs the Dial leaves alone; stored as exclusions so new devices are enabled |
-| `knownOutputDevices` | [String: String] | [:] | UID to name of every output seen; written only when something is new |
+| `knownOutputDevices` | [String: String] | [:] | UID to name of every output seen; written only when something is new, without `onChange` |
 | `softwareVolumeDevices` | [String] | [] | device UIDs with software volume turned on (§7.9) |
 | `softwareVolumeLevels` | [String: Double] | [:] | last software level per device, 1.0 when absent; written per Dial step without `onChange` |
 | `keptInputDevice` | String | "" | UID of the input device kept active (§7.13); empty means off, read as `keptInputDeviceUID == nil` |
-| `knownInputDevices` | [String: String] | [:] | UID to name of every input seen, so a disconnected kept device can still be named; written only when something is new |
+| `knownInputDevices` | [String: String] | [:] | UID to name of every input seen, so a disconnected kept device can still be named; written only when something is new, without `onChange` |
 
 Out-of-range stored values fall back to the default. Launch at login is not stored; `SMAppService.mainApp.status` is the source of truth (`register()` / `unregister()` in `LoginItem`, a caseless enum).
 

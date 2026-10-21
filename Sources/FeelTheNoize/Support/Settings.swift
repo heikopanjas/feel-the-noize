@@ -32,7 +32,9 @@ final class Settings {
     private static let defaultDetents = 36
     private static let defaultStepPercent = 2
 
-    /// Called after every write.
+    /// Called after every write of a setting. Bookkeeping writes bypass it: the remembered device names, which arrive from
+    /// `AudioOutput.onChange` and would otherwise refresh the audio output from inside its own callback, and the software
+    /// volume levels, written on every Dial step.
     var onChange: (() -> Void)?
 
     private let defaults: UserDefaults
@@ -140,7 +142,7 @@ final class Settings {
         softwareVolumeDeviceUIDs = uids
     }
 
-    /// Writes, and so calls `onChange`, only when a device or name is new.
+    /// Writes only when a device or name is new, and never calls `onChange`.
     func rememberDevices(_ names: [String: String]) {
         remember(names, known: knownDevices, forKey: Key.knownOutputDevices)
     }
@@ -162,7 +164,7 @@ final class Settings {
         defaults.dictionary(forKey: Key.knownInputDevices) as? [String: String] ?? [:]
     }
 
-    /// Writes, and so calls `onChange`, only when a device or name is new.
+    /// Writes only when a device or name is new, and never calls `onChange`.
     func rememberInputDevices(_ names: [String: String]) {
         remember(names, known: knownInputDevices, forKey: Key.knownInputDevices)
     }
@@ -170,7 +172,7 @@ final class Settings {
     private func remember(_ names: [String: String], known: [String: String], forKey key: String) {
         let merged = known.merging(names) { _, new in new }
         guard merged != known else { return }
-        write(merged, forKey: key)
+        defaults.set(merged, forKey: key)
     }
 
     private func write(_ value: Any, forKey key: String) {

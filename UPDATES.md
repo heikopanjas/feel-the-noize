@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.3, review 1.3: no refresh from inside AudioOutput.onChange)
+
+- `Settings.rememberDevices` and `rememberInputDevices` no longer call `onChange`: they are bookkeeping, and `AppDelegate` calls the first from inside `AudioOutput.onChange`, which made `Settings.onChange` refresh the audio output and re-enter `publish` while it was still running. Reason: `Docs/CODE_REVIEW.md` §2.3; it worked only because `state` was assigned before the callback.
+- `AudioOutput.refresh()` now owns the side effects (software volume reconciliation, the rejected-write check, the emulated mute) around a pure `readState`, and `publish` asserts in Debug that it is not re-entered. Reason: §2.5, so a nested refresh cannot start or stop the tap halfway through a read.
+- version bump: 1.2.2 to 1.2.3 (PATCH - internal, no user-visible change)
+
 ### 2026-10-22 (v1.2.2, review 1.2: keep-awake timer test without the clock)
 
 - `DialKeepAwake` takes its sleep as an injected `(Duration) async -> Void`, `Task.sleep` by default; the tests pass the new `ManualSleeper` fixture (`Tests/FeelTheNoizeTests/Fixtures`), which parks the timer on a continuation and releases it on demand. Reason: `Docs/CODE_REVIEW.md` §2.2; the old test polled with 10 ms sleeps under a 2 s deadline, the only timing-dependent test in the suite.

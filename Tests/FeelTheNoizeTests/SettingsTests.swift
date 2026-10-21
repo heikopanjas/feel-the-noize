@@ -75,7 +75,7 @@ struct SettingsTests {
         }
     }
 
-    @Test func rememberDevicesMergesAndWritesOnlyWhatIsNew() {
+    @Test func rememberDevicesMergesWithoutOnChange() {
         withSettings { settings, _ in
             var changes = 0
             settings.onChange = { changes += 1 }
@@ -83,11 +83,10 @@ struct SettingsTests {
             settings.rememberDevices(["airpods": "AirPods Pro"])
             settings.rememberDevices(["speakers": "MacBook Pro Speakers"])
             #expect(settings.knownDevices == ["speakers": "MacBook Pro Speakers", "airpods": "AirPods Pro"])
-            #expect(changes == 2)
 
             settings.rememberDevices(["airpods": "Heiko's AirPods"])
             #expect(settings.knownDevices["airpods"] == "Heiko's AirPods")
-            #expect(changes == 3)
+            #expect(changes == 0, "Remembering names is bookkeeping and must not refresh the settings")
         }
     }
 
@@ -160,7 +159,7 @@ struct SettingsTests {
             settings.rememberInputDevices(["m2": "M2"])
             #expect(settings.knownInputDevices == ["m2": "M2"])
             #expect(settings.knownDevices.isEmpty)
-            #expect(changes == 1)
+            #expect(changes == 0)
         }
     }
 }

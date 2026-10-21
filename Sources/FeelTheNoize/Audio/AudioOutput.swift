@@ -35,6 +35,8 @@ final class AudioOutput: AudioControlling {
     private var volumeCheck = VolumeWriteCheck()
     private var volumeCheckTask: Task<Void, Never>?
     private var lastProbe: ContinuousClock.Instant?
+    /// `onChange` runs synchronously; a listener that refreshed this object from inside it would publish twice.
+    private var isPublishing = false
 
     func start() {
         guard systemListener == nil else { return }
@@ -255,7 +257,8 @@ final class AudioOutput: AudioControlling {
         }
     }
 
-    /// Re-reads the full state; `onChange` fires only when it differs from the cached one.
+    /// Re-reads the full state; `onChange` fires only when it differs from the cached one. Software volume is reconciled,
+    /// the rejected-write check fed and the emulated mute resolved here, so `readState` stays a pure read.
     private func refresh() {
         guard let deviceID = observedDeviceID else {
             _ = reconcileSoftwareVolume(uid: nil, nativeCanSetVolume: true)
@@ -263,7 +266,18 @@ final class AudioOutput: AudioControlling {
             return
         }
         do {
-            publish(try readState(of: deviceID))
+            let uid = try CoreAudioProperty.readString(kAudioDevicePropertyDeviceUID, of: deviceID)
+            let name = try CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID)
+            let nativeCanSetVolume = CoreAudioProperty.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID)
+            let isSoftwareVolume = reconcileSoftwareVolume(uid: uid, nativeCanSetVolume: nativeCanSetVolume)
+            var state = try readState(
+                of: deviceID, uid: uid, name: name, nativeCanSetVolume: nativeCanSetVolume, isSoftwareVolume: isSoftwareVolume)
+            if nativeCanSetVolume {
+                volumeCheck.didRead(state.volume)
+                state.isInUseElsewhere = volumeCheck.isRejected
+            }
+            resolveEmulatedMute(in: &state)
+            publish(state)
         }
         catch {
             Log.audio.error("\(error, privacy: .public)")
@@ -275,6 +289,7 @@ final class AudioOutput: AudioControlling {
     }
 
     private func publish(_ newState: AudioState?) {
+        assert(!isPublishing, "AudioOutput.publish re-entered from its own onChange")
         var newState = newState
         if let state, let candidate = newState, candidate.deviceID == state.deviceID,
             abs(candidate.volume - state.volume) < Self.volumeTolerance
@@ -292,46 +307,45 @@ final class AudioOutput: AudioControlling {
             }
         }
         state = newState
+        isPublishing = true
+        defer { isPublishing = false }
         onChange?(newState)
     }
 
-    private func readState(of deviceID: AudioObjectID) throws -> AudioState {
-        let uid = try CoreAudioProperty.readString(kAudioDevicePropertyDeviceUID, of: deviceID)
-        let name = try CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID)
-        let nativeCanSetVolume = CoreAudioProperty.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID)
-        let isSoftwareVolume = reconcileSoftwareVolume(uid: uid, nativeCanSetVolume: nativeCanSetVolume)
-        let canSetVolume = nativeCanSetVolume || isSoftwareVolume
+    /// A pure read of the device: no state of this object changes here.
+    private func readState(
+        of deviceID: AudioObjectID, uid: String, name: String, nativeCanSetVolume: Bool, isSoftwareVolume: Bool
+    ) throws -> AudioState {
         // Without any volume control the device plays at its fixed level, which is shown as full.
-        var volume: Float32
+        let volume: Float32
         if nativeCanSetVolume {
             volume = try CoreAudioProperty.readVolume(of: deviceID)
-            volumeCheck.didRead(volume)
         }
         else {
             volume = isSoftwareVolume ? softwareVolume.level : 1
         }
         let hasHardwareMute = CoreAudioProperty.isSettable(CoreAudioProperty.muteAddress, of: deviceID)
-
         let isMuted: Bool
         if hasHardwareMute {
             isMuted = try CoreAudioProperty.readMute(of: deviceID)
         }
-        else if emulatedMuteVolumes[uid] != nil, volume > 0 {
-            // A non-zero volume set elsewhere clears the emulated mute.
-            emulatedMuteVolumes[uid] = nil
+        else {
             isMuted = false
         }
-        else {
-            isMuted = emulatedMuteVolumes[uid] != nil
-            if isMuted {
-                volume = 0
-            }
-        }
-
         return AudioState(
-            deviceID: deviceID, deviceUID: uid, deviceName: name, volume: volume, isMuted: isMuted, canSetVolume: canSetVolume,
-            hasHardwareMute: hasHardwareMute, isSoftwareVolume: isSoftwareVolume,
-            isInUseElsewhere: nativeCanSetVolume && volumeCheck.isRejected)
+            deviceID: deviceID, deviceUID: uid, deviceName: name, volume: volume, isMuted: isMuted,
+            canSetVolume: nativeCanSetVolume || isSoftwareVolume, hasHardwareMute: hasHardwareMute, isSoftwareVolume: isSoftwareVolume)
+    }
+
+    /// Without a mute control, a remembered volume means muted at zero; a non-zero volume set elsewhere clears it.
+    private func resolveEmulatedMute(in state: inout AudioState) {
+        guard !state.hasHardwareMute, emulatedMuteVolumes[state.deviceUID] != nil else { return }
+        if state.volume > 0 {
+            emulatedMuteVolumes[state.deviceUID] = nil
+        }
+        else {
+            state.isMuted = true
+        }
     }
 
     // MARK: - Property Addresses
