@@ -20,7 +20,7 @@ Feel the Noize turns a Microsoft Surface Dial into a hardware volume knob for th
 - pressing the Dial toggles mute,
 - the Dial's built-in haptic motor gives a detent click per step.
 
-The menu also lists the output and input devices and switches between them (M6), and one input device can be kept active when macOS would switch to a newly connected headset (M8). Planned (§13): battery levels of the devices.
+The menu also lists the output and input devices with their battery levels and switches between them (M6, M7), and one input device can be kept active when macOS would switch to a newly connected headset (M8).
 
 The app is a native AppKit menu bar utility with no third-party dependencies. This document is the hand-off specification for implementation: it records what is known about the hardware, the decisions taken, the architecture, and the open points that must be verified on real hardware first.
 
@@ -92,8 +92,8 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-15 | Turning the Dial on a device it cannot control plays the end-stop buzz once per gesture, so the user knows nothing will change. |
 | FR-16 | While the Mac is in use, Feel the Noize keeps the Dial out of its idle sleep, so the first turn is not lost to the reconnect. On by default; can be turned off in Settings (§7.14). |
 | FR-17 | Using the Dial counts as user activity, as using the mouse does: a touch or turn wakes a sleeping display, and the screen saver does not start while the Dial is in use (§7.15). |
-| FR-18 | The menu shows the Dial's battery level, read from the Bluetooth Battery Service (§7.10). |
-| FR-19 | Device list and switching done in M6; battery levels planned (M7). The menu lists the connected output and input devices; the default output and the default input are shown in bold, Bluetooth devices show their battery level, and clicking a device makes it the default (§7.11, §7.12). |
+| FR-18 | The menu shows the Dial's battery level, read from the accessory power sources (§7.10). |
+| FR-19 | The menu lists the connected output and input devices; the default output and the default input are shown in bold, Bluetooth devices show their battery level, and clicking a device makes it the default (§7.11, §7.12). |
 | FR-20 | The menu shows the current default input device between the output and volume lines (§5.3). |
 | FR-21 | The user can choose one input device that is kept active: while it is connected, Feel the Noize reverts every change of the default input to it (§7.13). |
 | FR-22 | The menu has a volume slider for the current output above the device sections; moving it unmutes (§5.3, §7.5). |
@@ -153,7 +153,7 @@ Output: AirPods Pro                (disabled info item; "(Dial off)" appended wh
 Input: MOTU M2                     (disabled info item)
 Volume: 42 %                       (disabled info item)
 ─────────────
-Volume                             (bold heading)
+Volume                             (section header)
 [🎧━━━━━━━●──────────]             (volume slider)
 Output                             (section header)
 (●) **AirPods Pro**                (accent circle and bold: default output)
@@ -164,7 +164,7 @@ Input                              (section header)
 (○) MacBook Pro Microphone
 (●) **MOTU M2**                    (accent circle and bold: default input)
 ─────────────
-Mute                         ✓     (toggles mute; state reflects mute)
+Mute                         🔊    (toggles mute; 🔇 while muted)
 ─────────────
 Settings…                    ⌘,
 About Feel the Noize
@@ -172,13 +172,15 @@ About Feel the Noize
 Quit Feel the Noize                ⌘Q
 ```
 
-**Planned addition (M7, FR-19):** the battery text after a device name in both sections, for example "AirPods Pro    L 80 %, R 75 %, case 40 %" (§7.12).
+Device items carry the battery level at the right edge, in the same small font and the same column as the Dial row's battery: "96 %" with the battery symbol for a single-cell device such as AirPods Max, "L 80 %, R 75 %, case 40 %" for AirPods with separate parts (§7.12). Requested by the developer 2026-10-21 after a first version placed it in the regular menu font at a tab stop. Each device item is therefore a `MenuDeviceRow` (`UI/MenuDeviceRow.swift`), a custom item view with the 14 pt inset of the status rows: the `DeviceIcon` circle, the name in the menu font (bold for the default), and the battery from `BatteryIcon.attributedText(_:level:)`, which the Dial row uses as well. As a view-based item it draws its own highlight, a rounded gray background inset 5 pt like the macOS Sound menu, performs the item's action on mouse up after `cancelTracking()`, and exposes one accessibility element with role menu item and a label such as "AirPods Max, current output, battery 96 %".
 
 The Input line appends "(kept)" when the default input is the kept device (§7.13).
 
 The Input line reads "Input: None" without an input device. Device items are commands, so they use the regular menu font and label color. Each carries a device symbol in a circle, as in the macOS Sound menu: the default device of its section has an accent circle with a white glyph and a bold title, the others a gray circle. A section without devices is left out. Details in §7.11.
 
-The volume slider is an `NSSlider` (0…1, continuous) in a custom item view below a bold "Volume" heading, both inset 14 pt like the section headers, and widened with the menu. Its look follows the macOS Sound menu (requested by the developer 2026-10-21): `VolumeSlider` (`UI/VolumeSlider.swift`, an `NSSlider` subclass with a nested `NSSliderCell` that only replaces drawing) draws a 22 pt capsule track with a 1 pt border around the whole capsule, a white fill up to a white round knob as high as the track with a thin edge and a soft shadow, and at the left end a light gray glyph drawn above the knob, so it stays visible at zero. Colors are fixed values measured on a screenshot of the Sound menu in light mode (track `#D8D8D8`, border `#C6C6C6` on the menu background `#EBEBEB`); the dark values are estimates. The slider returns `allowsVibrancy = false`, because the menu's vibrant material would otherwise blend them and lower the contrast. The glyph is the output's headphone symbol for headphones and AirPods, otherwise `speaker.wave.2.fill` (`DeviceIcon.sliderSymbolName(for:)`). The bar spans the whole cell and the knob is as thick as the bar, so the default tracking puts the knob under the pointer. Disabled, fill and knob are drawn at half opacity. It shows the volume of the current output and stands at zero while muted, like the system Sound menu. It is disabled without an output device, for a device without volume control (then at its fixed full level) and while another device owns the output (§7.4, "Rejected writes"). Moving it unmutes first, then sets the volume through `AudioOutput`, including software volume; like the menu's Mute it gives no haptics and no overlay, and it ignores whether the output is selected in the Devices tab, since that setting concerns the Dial only.
+The volume slider is an `NSSlider` (0…1, continuous) in a custom item view below a "Volume" section header (`NSMenuItem.sectionHeader(title:)`, the same style as Output and Input, changed from a bold label at the menu font size at the developer's request 2026-10-21), inset 14 pt like the section headers, and widened with the menu. Its look follows the macOS Sound menu (requested by the developer 2026-10-21): `VolumeSlider` (`UI/VolumeSlider.swift`, an `NSSlider` subclass with a nested `NSSliderCell` that only replaces drawing) draws a 22 pt capsule track with a 1 pt border around the whole capsule, a white fill up to a white round knob as high as the track with a thin edge and a soft shadow, and at the left end a light gray glyph drawn above the knob, so it stays visible at zero. Colors are fixed values measured on a screenshot of the Sound menu in light mode (track `#D8D8D8`, border `#C6C6C6` on the menu background `#EBEBEB`); the dark values are estimates. The slider returns `allowsVibrancy = false`, because the menu's vibrant material would otherwise blend them and lower the contrast. The glyph is the output's headphone symbol for headphones and AirPods, otherwise `speaker.wave.2.fill` (`DeviceIcon.sliderSymbolName(for:)`). The bar spans the whole cell and the knob is as thick as the bar, so the default tracking puts the knob under the pointer. Disabled, fill and knob are drawn at half opacity. It shows the volume of the current output and stands at zero while muted, like the system Sound menu. It is disabled without an output device, for a device without volume control (then at its fixed full level) and while another device owns the output (§7.4, "Rejected writes"). Moving it unmutes first, then sets the volume through `AudioOutput`, including software volume; like the menu's Mute it gives no haptics and no overlay, and it ignores whether the output is selected in the Devices tab, since that setting concerns the Dial only.
+
+The Mute item shows its state with a symbol at its right edge, `speaker.wave.2.fill` or `speaker.slash.fill`, instead of a checkmark (chosen by the developer 2026-10-21 over a Mute/Unmute title): a checkmark makes macOS add a state column to the whole menu, which shifted the standard items to the right of the custom rows whenever the output was muted. `MenuMuteRow` (`UI/MenuMuteRow.swift`) is a custom item view that draws the title at the 14 pt inset, the symbol at the right edge, and the standard accent highlight with white text, since it sits among standard items; it performs the item's action on mouse up and exposes role menu item with value "on" or "off". No item of the menu has a state, so the state column never appears.
 
 The status lines (Dial, Output, Input, Volume) use the menu font at the small system size and the secondary label color, so they read as information rather than commands. Each is a `MenuInfoRow` (`UI/MenuInfoRow.swift`), a custom item view with the 14 pt inset of the volume heading and slider, because a menu item title cannot align anything with the right edge of the menu. The Dial row shows the battery at its right edge like the AirPods row of the macOS Sound menu, chosen by the developer 2026-10-21: "85 %" followed by `BatteryIcon` (`UI/BatteryIcon.swift`), a 20 × 9.5 pt battery drawn with a light outline and a fill proportional to the level in the secondary label color, red at 20 % and below. SF Symbols has the battery only in quarter steps, and `battery.100percent` ignores a variable value. Percentage and symbol are one attributed string with the symbol as text attachment. The battery appears only while the Dial is connected and the level is known (§7.10). The menu is built once. Titles and states are set on every state change, so they stay current while the menu is open, for example while the Dial turns. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
 
@@ -200,7 +202,7 @@ Source: [`diagrams/class-overview.puml`](diagrams/class-overview.puml)
 | Module | Responsibility |
 |---|---|
 | **App** | `main.swift` creates `NSApplication` and installs `AppDelegate`. `AppDelegate` owns all long-lived objects, wires their callbacks, starts and stops them. No storyboards or nibs. |
-| **Dial** | `DialDevice` owns the IOKit HID session for the Dial: discovery, input reports, feature/output reports, reconnection. `DialReport` is a pure encoder/decoder for the byte layouts. `DialEvent` is the device-independent event vocabulary. `DialBattery` reads the battery level, `DialKeepAwake` keeps the Dial awake while the Mac is in use. |
+| **Dial** | `DialDevice` owns the IOKit HID session for the Dial: discovery, input reports, feature/output reports, reconnection. `DialReport` is a pure encoder/decoder for the byte layouts. `DialEvent` is the device-independent event vocabulary. `DialKeepAwake` keeps the Dial awake while the Mac is in use. |
 | **Control** | `DialController` is the gesture recognizer and the only place that decides what a Dial event does. It depends on two protocols (`AudioControlling`, `HapticFeedback`) so it can be unit-tested without hardware. `VolumeStepper` holds the step math. |
 | **Audio** | `AudioOutput` wraps Core Audio for the default output device: read and write volume and mute, observe device and property changes, publish `AudioState`. |
 | **UI** | `StatusItemController` (NSStatusItem and menu), `VolumeOverlay` (HUD panel), `SettingsWindowController` (preferences window). |
@@ -570,14 +572,11 @@ Teardown reverses the order: stop and destroy the IO proc, destroy the aggregate
 
 ### 7.10 Dial Battery Level
 
-The HID descriptor has no battery usage, but the Dial exposes the standard Bluetooth Battery Service (`0x180F`), which macOS reads too (System Information shows it). `DialBattery` reads it with CoreBluetooth over the link the system already holds:
+The HID descriptor has no battery usage. The Dial level comes from the accessory power sources that also supply the AirPods levels (§7.12): a probe on 2026-10-21 showed the Dial as a source with `Name` "Surface Dial", `Vendor ID` 1118 (Microsoft), `Product ID` 2331, `Transport Type` "Bluetooth LE" and a UUID as `Accessory Identifier`, so it is found by vendor and product ID (`AccessoryBattery.dialLevel(from:)`).
 
-1. On the first `.connected` it creates a `CBCentralManager` on the main queue. The Bluetooth permission prompt therefore appears only once a Dial is present; its text comes from `NSBluetoothAlwaysUsageDescription` in `Configuration/FeelTheNoize-Info.plist`.
-2. When powered on, `retrieveConnectedPeripherals(withServices: [0x180F])` finds the peripheral named "Surface Dial", and `connect` attaches Feel the Noize to the existing link.
-3. It discovers the Battery Level characteristic (`0x2A19`), reads it once and subscribes to notifications, so the level stays current without polling.
-4. On disconnect it cancels only its own use of the link and reports the level as unknown.
+`StatusItemController` reads the sources when the menu opens and on every device list change while it is open, and shows the level at the right edge of the Dial row (§5.3) while the Dial is connected. No power source notification is registered, so it adds no idle work.
 
-`AppDelegate` passes the level to `StatusItemController.setDialBatteryLevel(_:)`, which shows it at the right edge of the Dial row (§5.3). Verified 2026-10-18: the level (100 %) arrived about 2 s after the HID connection. If Bluetooth access is denied, the level stays unknown and the Dial line shows no battery.
+Until 2026-10-21, `DialBattery` read the standard Bluetooth Battery Service (`0x180F`) with CoreBluetooth, which needed the Bluetooth permission and `NSBluetoothAlwaysUsageDescription`. The developer chose to replace it after M7 showed the Dial among the power sources: no Bluetooth permission prompt and one source for all battery levels, in exchange for a level read when the menu opens instead of pushed live, and a Dial battery that now also depends on the undeclared call (R9).
 
 ### 7.11 Device Menu
 
@@ -587,7 +586,7 @@ The menu lists every connected output and input device and switches the default 
 
 **Lifetime.** `StatusItemController` owns its own `AudioDeviceList`, started when the menu opens and stopped in `menuDidClose(_:)`. The list therefore stays current while the menu is open, for example when AirPods connect, and registers no listener while the menu is closed (NFR-2). On every list change the device items after the volume slider are removed and rebuilt.
 
-**Items.** Each section starts with `NSMenuItem.sectionHeader(title:)`, "Output" and "Input", sorted by name like the Devices tab (`StatusItemController.deviceSections(_:)`, `localizedStandardCompare`); a section without devices is left out. A device item uses the regular menu font, the default device of its section the bold system font at the menu font size through `attributedTitle`, and carries its UID as `representedObject` and a `DeviceIcon` image (below). The battery text (§7.12, M7) will follow the name in the secondary label color, right-aligned with a tab stop. A device appears in the menu only while it is connected; remembered devices stay in the Devices tab.
+**Items.** Each section starts with `NSMenuItem.sectionHeader(title:)`, "Output" and "Input", sorted by name like the Devices tab (`StatusItemController.deviceSections(_:)`, `localizedStandardCompare`); a section without devices is left out. A device item carries its UID as `representedObject` and its name as title for type-to-select, and is drawn by a `MenuDeviceRow` (§5.3) with the `DeviceIcon` circle (below), the name in the menu font, bold for the default device of its section, and the battery level (§7.12) at the right edge. A device appears in the menu only while it is connected; remembered devices stay in the Devices tab.
 
 **Icons.** Chosen by the developer on 2026-10-21 over plain template symbols, keeping the bold default title as well: `DeviceIcon` (`UI/DeviceIcon.swift`, caseless enum) draws a 26 pt circle with an SF Symbol at 13 pt in hierarchical rendering, measured on a screenshot of the macOS Sound menu. The default device of a section gets `controlAccentColor` with a white glyph, every other device `quaternaryLabelColor` with a `labelColor` glyph; the colors resolve at draw time, so light and dark mode and the accent color follow. The image carries "current output" or "current input" as accessibility description for the default. Core Audio offers no artwork (`kAudioDevicePropertyIcon` exists on none of the devices probed on 2026-10-21), so `AudioDeviceInfo` also carries `modelUID` and `outputDataSource`, and the symbol follows these rules:
 
@@ -609,19 +608,19 @@ The product IDs come from public device lists; only AirPods Max (USB-C, `201f 4c
 
 **Input line.** "Input: <name>" comes from the default input of the menu's `AudioDeviceList` (`StatusItemController.inputTitle(_:isKept:)`), "Input: None" without one; "(kept)" is appended when it is the kept device (`StatusItemController.keptInputUID`, set by `AppDelegate`).
 
-### 7.12 Accessory Battery Levels (planned, M7)
+### 7.12 Accessory Battery Levels
 
-AirPods and most Classic Bluetooth headphones do not offer the Battery Service that `DialBattery` reads (§7.10). Options evaluated on 2026-10-18 with the developer: CoreBluetooth only (no AirPods), `system_profiler` (public, but a separate process taking 1 to 2 s per menu open) and `IOPSCopyPowerSourcesByType(4)` (chosen).
+AirPods and most Classic Bluetooth headphones do not offer the Bluetooth Battery Service. Options evaluated on 2026-10-18 with the developer: CoreBluetooth only (no AirPods), `system_profiler` (public, but a separate process taking 1 to 2 s per menu open) and `IOPSCopyPowerSourcesByType(4)` (chosen).
 
-**Source.** `IOPSCopyPowerSourcesByType` is exported by IOKit but has no header, so it is looked up with `dlsym`; type 4 returns accessory power sources, decoded with the public `IOPSCopyPowerSourcesList` and `IOPSGetPowerSourceDescription`. Voltaic validated it on hardware: one in-process call covers AirPods with separate left, right and case cells as well as other Bluetooth accessories, with no permission prompt. Keys used: `Accessory Identifier` (Bluetooth address), `Group Identifier` (joins the parts of one AirPods), `Part Identifier` (`Left`, `Right`, `Case`), `Current Capacity`, `Name`. This is the only undeclared API in Feel the Noize, accepted because its failure only hides the battery text; if `dlsym` finds no symbol, the reader returns no levels and the menu shows none (R9).
+**Source.** `IOPSCopyPowerSourcesByType` is exported by IOKit but has no header, so it is looked up with `dlsym`; type 4 returns accessory power sources, decoded with the public `IOPSCopyPowerSourcesList` and `IOPSGetPowerSourceDescription`. Voltaic validated it on hardware: one in-process call covers AirPods with separate left, right and case cells as well as other Bluetooth accessories, with no permission prompt. Keys used: `Accessory Identifier` (Bluetooth address), `Group Identifier` (joins the parts of one AirPods), `Part Identifier` (`Left`, `Right`, `Case`), `Current Capacity`, `Name`. This is the only undeclared API in Feel the Noize, accepted because its failure only hides the battery text, the Dial's included (§7.10); if `dlsym` finds no symbol, the reader returns no levels and the menu shows none (R9).
 
-**Reading.** `AccessoryBattery` (struct with a static reader, `Audio/AccessoryBattery.swift`) is read when the menu opens and again when the device list changes while it is open. No power source notification is registered, so it adds no idle work.
+**Reading.** `AccessoryBattery.read()` (`Audio/AccessoryBattery.swift`) returns `Readings` with the audio accessories by address and the Dial level. `StatusItemController` calls it when the menu opens and again when the device list changes while it is open. No power source notification is registered, so it adds no idle work. Parts are grouped by `Group Identifier`, falling back to `Accessory Identifier`; sources without a Bluetooth address in their identifier, such as the Dial, are not audio accessories.
 
-**Matching.** A battery belongs to the Core Audio device whose UID carries the same Bluetooth address, compared as uppercase hex digits without separators. Whether every Bluetooth audio UID carries the address is to be verified (R10).
+**Matching.** A battery belongs to the Core Audio device whose UID carries the same Bluetooth address: `AccessoryBattery.address(in:)` finds six hex pairs separated by `-` or `:` and compares them as twelve uppercase hex digits. Verified for AirPods Max on 2026-10-21: Core Audio UIDs `70-F9-4A-A8-CE-BF:output` and `…:input`, power source `70:F9:4A:A8:CE:BF` (R10). Both Core Audio devices match, so the level shows in both sections.
 
-**Text.** AirPods: "L 80 %, R 75 %, case 40 %"; parts that report nothing are left out (the case reports only while it is open). Single-cell devices: "80 %". No battery, no text.
+**Text.** AirPods: "L 80 %, R 75 %, case 40 %"; parts that report nothing are left out (the case reports only while it is open). Single-cell devices: "80 %" followed by the `BatteryIcon` symbol of the Dial row (§5.3). No battery, no text. `MenuDeviceRow` places it at the right edge in the column of the Dial row's battery.
 
-**Dial.** If the capture in M7 shows the Surface Dial among the accessory sources, `DialBattery` and its Bluetooth permission prompt could be replaced; decided after M7.
+**Dial.** The Surface Dial is among the accessory sources, so it replaced `DialBattery` (§7.10).
 
 ### 7.13 Kept Input Device
 
@@ -768,13 +767,14 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 | `VolumeWriteCheckTests` | an accepted write, a snap-back after the echo, a fast spin returning to the volume before the first write, a probe that clears or keeps the rejection, a change from elsewhere |
 | `UserActivityTests` | declares at most once per interval, again after it, and keeps declaring after a failure |
 | `DialKeepAwakeTests` | the timer runs only while enabled, connected and displays awake; `stop()` ends it; reports are sent after each interval, not at start; `sendNow()` sends only while the timer runs |
+| `AccessoryBatteryTests` | address from Core Audio UIDs and power source identifiers, none from USB UIDs or UUIDs; single cell from the AirPods Max capture; AirPods parts grouped and ordered; sources without address, level or known part skipped; case left out while silent; Dial found by vendor and product ID |
 | `KeepChoicesTests` | keep popup choices: connected inputs sorted by name, an absent kept device as "(not connected)" with its remembered name or its UID |
 | `SettingsTests` | kept input off by default, round trip, stored empty for off, `onChange` only on change; input names remembered apart from outputs; defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
 | `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
 | `DeviceIconTests` | slider symbol for headphones, speakers and no output; symbol per transport, direction, built-in name and data source, and Apple product ID; product ID parsing; every chosen symbol exists; circle image size, non-template, accessibility description, transparent corners |
 | `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |
-| `BatteryIconTests` | fill fraction clamped with a sliver for any charge, image size, accessibility description and ink at a low and a high level |
+| `BatteryIconTests` | fill fraction clamped with a sliver for any charge, image size, accessibility description and ink at a low and a high level; battery text with the symbol for a single cell only |
 | `StatusItemTitleTests` | Dial status line for each connection state; Input line with and without a device and with "(kept)"; device sections split by direction and sorted by name, a device with both directions in both |
 | `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture; rotation on an output owned by another device probes and buzzes once per gesture |
 
@@ -797,7 +797,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 13. Activity Monitor: 0 % CPU while idle. Measured 2026-10-18 on the M4 build: no measurable CPU time (below 0.01 s) over 60 s with the Dial connected but idle.
 14. M6: the menu lists outputs and inputs, the defaults in bold; clicking switches the default output and input; AirPods connecting while the menu is open appear in both sections. Check that system alert sounds follow the selected output. Switching outputs and inputs from the menu verified by the developer 2026-10-21; AirPods appearing while the menu is open and alert sounds not yet checked.
 15. M6: the Input line shows the default input and follows a change in System Settings.
-16. Planned (M7): AirPods show left, right and case levels in both sections; a Bluetooth headset without a reported battery shows none; levels match System Settings.
+16. M7: AirPods show left, right and case levels in both sections; a Bluetooth headset without a reported battery shows none; levels match System Settings.
 17. M8: keep the M2, join a call that uses the system default microphone, connect AirPods: output moves to the AirPods, input returns to the M2, the call keeps working. Unplug and replug the M2: input returns to it. Keep off: macOS behavior is back. Partly passed 2026-10-21 without a call: turning the keep on switched the input from the AirPods Max to the M2 at once; selecting the AirPods as output made macOS move the input to them as well, and Feel the Noize switched it back to the M2 55 to 65 ms later; selecting an input in the menu moved the keep. The call, unplugging and replugging the M2, and R11 are not yet observed.
 18. Keep-awake on: work on the Mac without touching the Dial for 15 minutes, then turn it: the first detent changes the volume, no ready click. Let the displays sleep: the Dial disconnects about 5 minutes later. First part passed provisionally 2026-10-19, from logs rather than a dedicated run: the Dial stayed connected from 11:44 to past 15:48 with keep-alives every 3 min 12 s, and at 13:43:28 the first turn after 17 idle minutes changed the volume without a reconnect or ready click. The display sleep part is not yet observed, because the screen saver kept the displays on.
 19. Quit Feel the Noize and leave the Dial untouched until it sleeps, then launch Feel the Noize: the menu says Not Connected; touch the Dial: ready click, then turning works. Launch with the Dial awake: no click. Passed 2026-10-19 on the release build: the developer felt the ready click after touching a Dial asleep at launch; with the Dial awake at launch the debug log shows no trigger, only the configuration and an immediate keep-alive.
@@ -820,16 +820,17 @@ FeelTheNoize/
 ├── Sources/FeelTheNoize/
 │   ├── App/                       main.swift, AppDelegate.swift
 │   ├── Dial/                      DialDevice.swift, DialReport.swift, DialEvent.swift,
-│   │                              DialConnection.swift, DialBattery.swift, DialKeepAwake.swift
+│   │                              DialConnection.swift, DialKeepAwake.swift
 │   ├── Control/                   DialController.swift, VolumeStepper.swift
 │   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift,
 │   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift, InputDeviceKeeper.swift,
+│   │                              AccessoryBattery.swift,
 │   │                              SoftwareVolume.swift, SoftwareGain.swift, VolumeWriteCheck.swift
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
 │   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
 │   │                              DeviceSettingsViewController.swift, VolumePresentation.swift,
 │   │                              KnobIcon.swift, DeviceIcon.swift, VolumeSlider.swift,
-│   │                              BatteryIcon.swift, MenuInfoRow.swift
+│   │                              BatteryIcon.swift, MenuInfoRow.swift, MenuDeviceRow.swift
 │   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift, UserActivity.swift
 │   └── Resources/                 Assets.xcassets
 └── Tests/FeelTheNoizeTests/      Swift Testing suites (from M2)
@@ -860,7 +861,7 @@ Build, through `build.sh` (several commands run in order, for example `./build.s
 | **M4 UI** | `StatusItemController`, `VolumeOverlay`, `VolumePresentation`, `Settings`, `SettingsWindowController`, `LoginItem`, `SettingsTests`; `DiagnosticsMenu` removed | checklist items 1–12 pass |
 | **M5 Release** | app icon (`scripts/render-icon.swift`: aluminum knob with an amber volume scale on a dark tile), README, `Makefile` with Developer ID signing and notarization, version 1.0.0 | checklist item 13 passes; notarized build runs on a second Mac |
 | **M6 Device menu** (built, hardware check pending) | `CoreAudioProperty` stream scope, default input and default device write; `AudioDeviceInfo.hasOutput` / `hasInput`; `AudioDeviceList` with inputs; device sections and Input line in `StatusItemController`; switching in `AppDelegate`; `AudioDeviceInfoTests` adapted, `StatusItemTitleTests` extended (§7.11) | checklist items 14 and 15 pass |
-| **M7 Battery levels** (planned) | `AccessoryBattery` with `dlsym` lookup, address matching and battery text; `AccessoryBatteryTests` for decoding description dictionaries, matching and text (§7.12) | checklist item 16 passes; R10 answered; decision on replacing `DialBattery` recorded |
+| **M7 Battery levels** (built, hardware check pending) | `AccessoryBattery` with `dlsym` lookup, address matching and battery text; `AccessoryBatteryTests` for decoding description dictionaries, matching and text (§7.12) | checklist item 16 passes; R10 answered; decision on replacing `DialBattery` recorded (2026-10-21: replaced, §7.10) |
 | **M8 Kept input** (built, hardware check pending) | `keptInputDevice` and `knownInputDevices` in `Settings`; `InputDeviceKeeper`; Devices tab popup; keep moved by the menu; `SettingsTests` extended, `KeepChoicesTests`, `StatusItemTitleTests` for "(kept)" (§7.13) | checklist item 17 passes; R11 checked |
 
 M8 depends only on the input list and the default device write from M6, so it can be built before M7.
@@ -878,7 +879,7 @@ M8 depends only on the input list and the default device write from M6, so it ca
 | R7 | Software volume adds latency for DAWs and depends on a permission | opt-in per device; checkpoint S2, S3, S7, S8 (§7.9); per-app bypass if recording timing suffers |
 | R8 | Dial wake-up is slow after its 5-minute sleep | Keep-awake spike 2026-10-18: reading feature report 1, re-sending the haptic configuration and a Stop trigger together every 4 minutes kept the link up through a 12-minute idle period (14:24:15 to 14:36:24) that would otherwise have ended in sleep at 14:29:12. The debug-only timer fired every 4 min 15 s, because macOS delays timers of background apps. A ready click on every connection, except one to a Dial already awake at launch, tells the user when the Dial is usable. **Decided 2026-10-19:** keep-awake ships on by default while the displays are awake, sends all three reports every 3 minutes, and the spike code is removed (§7.14, FR-16). Which report is responsible is still open; narrowing it down needs a temporary build that sends one report at a time. Checklist item 18 passed provisionally on 2026-10-19 for keep-awake while in use; the disconnect after display sleep is not yet observed |
 | R9 | `IOPSCopyPowerSourcesByType` has no header and may change or vanish in a macOS update | looked up with `dlsym`; a missing symbol or unknown keys only hide the battery text (§7.12); re-check after every major macOS release |
-| R10 | Does every Bluetooth audio device UID in Core Audio carry the Bluetooth address that IOPS reports as `Accessory Identifier`? | M7 logs both for AirPods and a non-Apple headset; if a UID lacks the address, the matching rule is decided then |
+| R10 | Does every Bluetooth audio device UID in Core Audio carry the Bluetooth address that IOPS reports as `Accessory Identifier`? | M7 logs both for AirPods and a non-Apple headset; if a UID lacks the address, the matching rule is decided then. **Answered for AirPods Max 2026-10-21:** UID `70-F9-4A-A8-CE-BF:output`, identifier `70:F9:4A:A8:CE:BF`. A non-Apple headset is not yet checked |
 | R11 | Between the macOS switch and Feel the Noize's revert, a call app recording from the system default may open the AirPods microphone, which switches them to the call profile and can glitch the call; another tool that enforces a different input would make both switch back and forth | M8 checks Zoom, Teams and Meet set to the system default; apps with an explicitly chosen microphone are not affected. A guard against switching back and forth is added only if the log shows it |
 
 ## 15. Future Ideas

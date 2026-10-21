@@ -21,4 +21,13 @@ struct BatteryIconTests {
             .filter { (rep.colorAt(x: $0.0, y: $0.1)?.alphaComponent ?? 0) > 0.3 }
         #expect(inked.count > 20)
     }
+
+    @Test func textWithSymbolForSingleCellOnly() {
+        let single = BatteryIcon.attributedText("96 %", level: 96)
+        #expect(single.string.hasPrefix("96 %"))
+        #expect(single.containsAttachments(in: NSRange(location: 0, length: single.length)))
+        let parts = BatteryIcon.attributedText("L 80 %, R 75 %", level: nil)
+        #expect(parts.string == "L 80 %, R 75 %")
+        #expect(!parts.containsAttachments(in: NSRange(location: 0, length: parts.length)))
+    }
 }

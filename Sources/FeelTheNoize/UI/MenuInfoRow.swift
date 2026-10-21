@@ -53,15 +53,7 @@ final class MenuInfoRow: NSView {
     private func updateBattery() {
         batteryLabel.isHidden = batteryLevel == nil
         guard let batteryLevel else { return }
-        let attachment = NSTextAttachment()
-        attachment.image = BatteryIcon.image(level: batteryLevel, accessibilityDescription: "battery")
-        // Centers the symbol on the digits instead of sitting on the baseline.
-        let offset = (Self.font.capHeight - BatteryIcon.size.height) / 2
-        attachment.bounds = NSRect(origin: NSPoint(x: 0, y: offset), size: BatteryIcon.size)
-        let text = NSMutableAttributedString(
-            string: "\(batteryLevel) %\u{2002}", attributes: [.font: Self.font, .foregroundColor: NSColor.secondaryLabelColor])
-        text.append(NSAttributedString(attachment: attachment))
-        batteryLabel.attributedStringValue = text
+        batteryLabel.attributedStringValue = BatteryIcon.attributedText("\(batteryLevel) %", level: batteryLevel)
     }
 
     /// Sets the natural width, which the menu uses to size itself, and places the parts from both edges.

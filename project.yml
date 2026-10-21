@@ -29,7 +29,6 @@ targets:
       path: Configuration/FeelTheNoize-Info.plist
       properties:
         NSAudioCaptureUsageDescription: Feel the Noize changes the volume of audio devices without volume control by adjusting the audio sent to them.
-        NSBluetoothAlwaysUsageDescription: Feel the Noize reads the battery level of your Surface Dial over Bluetooth.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.panjas.FeelTheNoize

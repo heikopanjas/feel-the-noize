@@ -22,6 +22,22 @@ nonisolated enum BatteryIcon {
         return clamped == 0 ? 0 : max(CGFloat(clamped) / 100, 0.08)
     }
 
+    /// The battery text of the menu rows in the small menu font: "85 %" followed by the symbol for a single cell, or text
+    /// such as "L 80 %, R 75 %, case 40 %" alone. Dial and device rows share it, so they look the same.
+    static func attributedText(_ text: String, level: Int?) -> NSAttributedString {
+        let font = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
+        let result = NSMutableAttributedString(string: text, attributes: attributes)
+        guard let level else { return result }
+        let attachment = NSTextAttachment()
+        attachment.image = image(level: level, accessibilityDescription: "battery")
+        // Centers the symbol on the digits instead of sitting on the baseline.
+        attachment.bounds = NSRect(origin: NSPoint(x: 0, y: (font.capHeight - size.height) / 2), size: size)
+        result.append(NSAttributedString(string: "\u{2002}", attributes: attributes))
+        result.append(NSAttributedString(attachment: attachment))
+        return result
+    }
+
     static func image(level: Int, accessibilityDescription: String?) -> NSImage {
         let image = NSImage(size: size, flipped: false) { rect in
             draw(level: level, in: rect)

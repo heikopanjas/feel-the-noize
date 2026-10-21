@@ -36,12 +36,6 @@ package "Dial" {
         + {static} hapticConfiguration(detents : Int, enabled : Bool) : [UInt8]
         + {static} manualTrigger(waveform : HapticWaveform, repeatCount : UInt8, retriggerMilliseconds : UInt16) : [UInt8]
     }
-    class DialBattery {
-        + level : Int?
-        + onChange : (Int?) -> Void
-        + dialConnected()
-        + dialDisconnected()
-    }
     class DialKeepAwake {
         + isEnabled : Bool
         + isDialConnected : Bool
@@ -110,6 +104,10 @@ package "Audio" {
         + {static} readVolume / writeVolume
         + {static} readMute / writeMute
     }
+    class AccessoryBattery <<struct>> {
+        + {static} read() : Readings
+        + text : String
+    }
     class InputDeviceKeeper {
         + keptUID : String?
     }
@@ -160,7 +158,6 @@ package "UI" {
         + onSelectInput : (String) -> Void
         + update(audio : AudioState?, dial : DialConnection, isOutputEnabled : Bool)
         + setAccessDenied(isDenied : Bool)
-        + setDialBatteryLevel(level : Int?)
     }
     class KnobIcon <<enum>> {
         + {static} image(style : Style, level : Float, isMuted : Bool, size : CGFloat) : NSImage
@@ -207,7 +204,6 @@ package "Support" {
 }
 
 AppDelegate *-- DialDevice
-AppDelegate *-- DialBattery
 AppDelegate *-- DialKeepAwake
 AppDelegate *-- UserActivity
 AppDelegate *-- AudioOutput
@@ -240,6 +236,7 @@ GeneralSettingsViewController ..> Settings : edits
 GeneralSettingsViewController ..> LoginItem : toggles
 DeviceSettingsViewController *-- AudioDeviceList
 StatusItemController *-- AudioDeviceList
+StatusItemController ..> AccessoryBattery : reads
 AppDelegate *-- InputDeviceKeeper
 InputDeviceKeeper ..> CoreAudioProperty : uses
 StatusItemController ..> DeviceIcon : draws

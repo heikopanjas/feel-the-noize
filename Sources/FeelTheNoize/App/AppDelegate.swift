@@ -8,7 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let dial: DialDevice
     private let controller: DialController
     private let overlay = VolumeOverlay()
-    private let battery = DialBattery()
     private let keepAwake: DialKeepAwake
     private let userActivity = UserActivity()
     private let inputKeeper = InputDeviceKeeper()
@@ -87,16 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Keep-awake first, so a Dial awake at launch can get its first report right away.
             self?.keepAwake.isDialConnected = connection == .connected
             self?.confirmConnection(connection)
-            if connection == .connected {
-                self?.battery.dialConnected()
-            }
-            else {
-                self?.battery.dialDisconnected()
-            }
             self?.refreshStatusItem()
-        }
-        battery.onChange = { [weak self] level in
-            self?.statusItem?.setDialBatteryLevel(level)
         }
         dial.onAccessDenied = { [weak self] in
             self?.isAccessDenied = true

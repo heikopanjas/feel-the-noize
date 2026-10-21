@@ -35,27 +35,24 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let inputRow = MenuInfoRow()
     private let volumeRow = MenuInfoRow()
     private let muteItem = NSMenuItem(title: "Mute", action: #selector(toggleMute(_:)), keyEquivalent: "")
+    private let muteRow = MenuMuteRow()
+    /// A section header like Output and Input, so all three share the system style.
+    private let volumeHeader = NSMenuItem.sectionHeader(title: "Volume")
     private let volumeSlider = VolumeSlider()
     /// The device sections are inserted right after the slider.
     private let sliderItem = NSMenuItem()
     private let deviceList = AudioDeviceList()
     private var deviceItems: [NSMenuItem] = []
+    /// Read with every device list change while the menu is open (§7.10, §7.12).
+    private var batteries = AccessoryBattery.Readings()
     private var audio: AudioState?
     private var dial = DialConnection.notConnected
     private var isOutputEnabled = true
-    private var dialBatteryLevel: Int?
     private static let iconSize: CGFloat = 18
-    /// Slider row measured on the macOS Sound menu: a bold heading above the slider, both lined up with the section
-    /// headers. AppKit widens the row to the menu.
+    /// The slider lines up with the section headers; AppKit widens the row to the menu.
     private static let sliderRowWidth: CGFloat = 240
     private static let sliderInset = MenuInfoRow.inset
-    private static let sliderBottomPadding: CGFloat = 8
-    private static let headingSpacing: CGFloat = 6
-    private static let headingTopPadding: CGFloat = 2
-    /// The default device of a section is also bold, in addition to the accent circle of its icon.
-    private static let defaultDeviceAttributes: [NSAttributedString.Key: Any] = [
-        .font: NSFont.boldSystemFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize)
-    ]
+    private static let sliderVerticalPadding: CGFloat = 5
 
     override init() {
         super.init()
@@ -90,12 +87,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             dial != .connected || audio?.canSetVolume != true || audio?.isInUseElsewhere == true || !isOutputEnabled
     }
 
-    /// `nil` while the level is unknown, for example right after the Dial connected.
-    func setDialBatteryLevel(_ level: Int?) {
-        dialBatteryLevel = level
-        updateDialRow()
-    }
-
     func setAccessDenied(_ isDenied: Bool) {
         accessItem.isHidden = !isDenied
     }
@@ -116,6 +107,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         accessItem.target = self
         accessItem.isHidden = true
         muteItem.target = self
+        muteItem.view = muteRow
         buildSliderItem()
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings(_:)), keyEquivalent: ",")
@@ -125,7 +117,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let quitItem = NSMenuItem(title: "Quit Feel the Noize", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for item in [
-            dialItem, accessItem, outputItem, inputItem, volumeItem, .separator(), sliderItem, .separator(), muteItem, .separator(),
+            dialItem, accessItem, outputItem, inputItem, volumeItem, .separator(), volumeHeader, sliderItem, .separator(), muteItem, .separator(),
             settingsItem, aboutItem, .separator(), quitItem
         ] {
             menu.addItem(item)
@@ -134,26 +126,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     private func buildSliderItem() {
-        let heading = NSTextField(labelWithString: "Volume")
-        heading.font = .boldSystemFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize)
-        heading.sizeToFit()
-        heading.setAccessibilityElement(false)
-
         let sliderHeight = VolumeSlider.trackHeight
-        let headingY = Self.sliderBottomPadding + sliderHeight + Self.headingSpacing
-        let row = NSView(
-            frame: NSRect(x: 0, y: 0, width: Self.sliderRowWidth, height: headingY + heading.frame.height + Self.headingTopPadding))
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: Self.sliderRowWidth, height: sliderHeight + 2 * Self.sliderVerticalPadding))
         row.autoresizingMask = [.width]
-        heading.setFrameOrigin(NSPoint(x: Self.sliderInset, y: headingY))
-        heading.autoresizingMask = [.maxXMargin]
-
         volumeSlider.frame = NSRect(
-            x: Self.sliderInset, y: Self.sliderBottomPadding, width: Self.sliderRowWidth - 2 * Self.sliderInset, height: sliderHeight)
+            x: Self.sliderInset, y: Self.sliderVerticalPadding, width: Self.sliderRowWidth - 2 * Self.sliderInset, height: sliderHeight)
         volumeSlider.autoresizingMask = [.width]
         volumeSlider.target = self
         volumeSlider.action = #selector(volumeSliderChanged(_:))
         volumeSlider.setAccessibilityLabel("Volume")
-        row.addSubview(heading)
         row.addSubview(volumeSlider)
         sliderItem.view = row
     }
@@ -191,8 +172,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         volumeSlider.isEnabled = audio.map { $0.canSetVolume && !$0.isInUseElsewhere } ?? false
         updateSliderSymbol()
 
-        muteItem.state = audio?.isMuted == true ? .on : .off
+        muteRow.isMuted = audio?.isMuted == true
         muteItem.isEnabled = audio.map { $0.hasHardwareMute || $0.canSetVolume } ?? false
+        muteRow.needsDisplay = true
     }
 
     // MARK: - Devices
@@ -205,6 +187,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         for item in deviceItems {
             menu.removeItem(item)
         }
+        batteries = AccessoryBattery.read()
+        updateDialRow()
         let sections = Self.deviceSections(deviceList.devices)
         deviceItems =
             sectionItems(.output, devices: sections.outputs, defaultUID: deviceList.defaultOutputUID)
@@ -228,7 +212,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     /// A section without devices is left out entirely. As in the macOS Sound menu, the default device is marked by the accent
-    /// circle of its icon, and its title is bold.
+    /// circle of its icon, and its name is bold. The title stays set for type-to-select; the row view draws the item.
     private func sectionItems(_ direction: DeviceIcon.Direction, devices: [AudioDeviceInfo], defaultUID: String?) -> [NSMenuItem] {
         guard !devices.isEmpty else { return [] }
         let (title, action, current) =
@@ -241,15 +225,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.target = self
             item.representedObject = device.uid
             let isDefault = device.uid == defaultUID
-            if isDefault {
-                item.attributedTitle = NSAttributedString(string: device.name, attributes: Self.defaultDeviceAttributes)
-            }
-            item.image = DeviceIcon.image(
-                symbolName: DeviceIcon.symbolName(for: device, direction: direction), isDefault: isDefault,
-                accessibilityDescription: isDefault ? current : nil)
+            let battery = battery(for: device)
+            let icon = DeviceIcon.image(
+                symbolName: DeviceIcon.symbolName(for: device, direction: direction), isDefault: isDefault, accessibilityDescription: nil)
+            let description = [device.name, isDefault ? current : nil, battery.map { "battery \($0.text)" }].compactMap(\.self)
+            item.view = MenuDeviceRow(
+                name: device.name, isDefault: isDefault, icon: icon, battery: battery.map { ($0.text, $0.singleLevel) },
+                accessibilityLabel: description.joined(separator: ", "))
             return item
         }
         return [.sectionHeader(title: title)] + items
+    }
+
+    /// A device with output and input, such as AirPods, shows the same battery in both sections.
+    private func battery(for device: AudioDeviceInfo) -> AccessoryBattery? {
+        AccessoryBattery.address(in: device.uid).flatMap { batteries.devices[$0] }
     }
 
     /// Both sections are sorted by name like the Devices tab; a device with output and input appears in both.
@@ -264,10 +254,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     // MARK: - Titles
 
-    /// The battery level shows only while the Dial is connected; it is kept while disconnected for the next connection.
+    /// The battery level shows only while the Dial is connected; it is read when the menu opens, the only time the row is
+    /// visible.
     private func updateDialRow() {
         dialRow.text = Self.title(for: dial)
-        dialRow.batteryLevel = dial == .connected ? dialBatteryLevel : nil
+        dialRow.batteryLevel = dial == .connected ? batteries.dialLevel : nil
     }
 
     static func title(for dial: DialConnection) -> String {

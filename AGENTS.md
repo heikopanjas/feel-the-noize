@@ -12,7 +12,7 @@ The full specification is `docs/DESIGN.md`. Read it before writing code; it is t
 
 - **Language:** Swift 6 language mode, default actor isolation `MainActor`
 - **UI:** AppKit only (NSStatusItem, NSMenu, NSPanel, NSWindowController); no SwiftUI, no storyboards or nibs
-- **Frameworks:** IOKit HID, CoreAudio, AudioToolbox, ServiceManagement, OSLog
+- **Frameworks:** IOKit HID and power sources, CoreAudio, AudioToolbox, ServiceManagement, OSLog
 - **Dependencies:** none (no Swift packages)
 - **Platform:** macOS 15.4+
 - **Build System:** XcodeGen (`project.yml`); the `.xcodeproj` is generated and not committed
@@ -76,7 +76,7 @@ plantuml -tsvg docs/diagrams/*.puml
 - Comments explain why, not what. `///` for documentation comments, `// MARK: -` to group sections.
 - Concurrency: everything is main-actor isolated. IOKit and Core Audio callbacks run on the main run loop / main queue and enter the actor with `MainActor.assumeIsolated`. No `@unchecked Sendable`, no locks. The single exception to main-actor isolation is the software volume IO block (`SoftwareVolume`), which runs on the HAL IO thread and shares only the gain through `Synchronization.Atomic` in a `nonisolated final class`; it must not allocate, lock or log. C callbacks resolve the main-actor owner from the context pointer before entering the actor; a non-Sendable CF argument such as `IOHIDDevice` is handed over through a commented `nonisolated(unsafe) let`, the only permitted unsafe opt-out.
 - Logging via `os.Logger(subsystem: "com.panjas.FeelTheNoize", category:)` with categories `dial`, `audio`, `control`, `ui`, defined in `Support/Log.swift`. A category is added with the milestone that first uses it.
-- Undeclared system APIs are allowed only where their failure degrades a non-essential feature, looked up with `dlsym` and recorded in `docs/DESIGN.md`. Currently only `IOPSCopyPowerSourcesByType` for battery levels (planned in M7).
+- Undeclared system APIs are allowed only where their failure degrades a non-essential feature, looked up with `dlsym` and recorded in `docs/DESIGN.md`. Currently only `IOPSCopyPowerSourcesByType` for the battery levels of the Dial and audio accessories (`AccessoryBattery`).
 - Milestone spike code that must not ship is wrapped in `#if DEBUG` and named in `docs/DESIGN.md` §13 together with the milestone that removes it.
 - Diagrams are PlantUML in `docs/diagrams/`, styled with the shared `visio2003.iuml` include.
 
@@ -187,3 +187,7 @@ Semantic versioning via `MARKETING_VERSION` in `project.yml`; bump `CURRENT_PROJ
 - M8 built: `keptInputDeviceUID` and `knownInputDevices` in `Settings`, `InputDeviceKeeper` with listeners only while a device is kept, a Keep input device popup in the Devices tab, the keep moved by choosing an input in the menu, and "(kept)" on the Input line. Tests: `SettingsTests` extended, `KeepChoicesTests` new, `StatusItemTitleTests` updated. Reason: FR-21 as designed in DESIGN.md §7.13. Checklist item 17 and R11 are pending on hardware.
 - M8 checked on hardware by the developer, from the log: the keep reverts the input to the M2 55 to 65 ms after macOS moves it to the AirPods Max on an output switch, and menu input choices move the keep. A call, unplugging the M2 and R11 not yet observed.
 - The keep moves before the menu writes the default input. Reason: the other order lets the keeper revert the user's choice to the old kept device.
+- M7 built: `AccessoryBattery` reads the accessory power sources through `dlsym`, matches audio devices by the Bluetooth address in their Core Audio UID, and the menu shows the level after each device name in a shared right tab column, with the battery symbol for single cells. R10 answered for AirPods Max: UID `70-F9-4A-A8-CE-BF:output` matches identifier `70:F9:4A:A8:CE:BF`.
+- `DialBattery` and CoreBluetooth removed, together with `NSBluetoothAlwaysUsageDescription`; the Dial level now comes from the same power sources, found by Microsoft vendor ID 1118 and product ID 2331, and is read when the menu opens. Reason: chosen by the developer after the probe showed the Dial among the sources; no Bluetooth permission prompt and one source for all levels, at the cost of no live push and a dependency on the undeclared call.
+- Device batteries moved from a tab stop in the regular menu font to the small font and the right-edge column of the Dial battery, requested by the developer. Device items became `MenuDeviceRow` custom views that draw a rounded gray highlight like the Sound menu and send the item action on mouse up; `BatteryIcon.attributedText(_:level:)` builds the battery text for Dial and device rows. Reason: a menu item title cannot align with the right edge of the menu; sharing the text builder keeps both rows identical.
+- The Volume heading became a system section header like Output and Input, requested by the developer. The Mute checkmark was replaced by a speaker symbol at the right edge in a `MenuMuteRow` custom view, chosen by the developer over a Mute/Unmute title. Reason: a checkmark makes macOS add a state column that shifted all standard items right of the custom rows while muted.
