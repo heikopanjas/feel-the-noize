@@ -173,6 +173,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         updateSliderSymbol()
 
         muteRow.isMuted = audio?.isMuted == true
+        muteItem.title = MenuMuteRow.title(isMuted: muteRow.isMuted)
         muteItem.isEnabled = audio.map { $0.hasHardwareMute || $0.canSetVolume } ?? false
         muteRow.needsDisplay = true
     }

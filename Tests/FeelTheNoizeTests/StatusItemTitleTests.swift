@@ -43,4 +43,9 @@ struct StatusItemTitleTests {
             uid: name, name: name, transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: output, hasInput: input, canSetVolume: output,
             hasHardwareMute: false)
     }
+
+    @Test func muteTitleFollowsTheState() {
+        #expect(MenuMuteRow.title(isMuted: false) == "Mute")
+        #expect(MenuMuteRow.title(isMuted: true) == "Unmute")
+    }
 }
