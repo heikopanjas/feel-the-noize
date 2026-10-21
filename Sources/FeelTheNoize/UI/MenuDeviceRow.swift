@@ -77,7 +77,7 @@ final class MenuDeviceRow: NSView {
 
     /// A view-based item does not send its action by itself.
     override func mouseUp(with event: NSEvent) {
-        guard let item = enclosingMenuItem, let menu = item.menu, let action = item.action else { return }
+        guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu, let action = item.action else { return }
         menu.cancelTracking()
         NSApp.sendAction(action, to: item.target, from: item)
     }

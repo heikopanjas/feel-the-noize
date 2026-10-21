@@ -27,13 +27,13 @@ struct AudioDeviceInfoTests {
     }
 
     @Test(
-        "Controllable with volume or mute",
-        arguments: [(true, true, true), (true, false, true), (false, true, true), (false, false, false)])
-    func controllable(canSetVolume: Bool, hasHardwareMute: Bool, expected: Bool) {
-        let device = AudioDeviceInfo(
-            uid: "x", name: "X", transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: true, hasInput: false,
-            canSetVolume: canSetVolume,
-            hasHardwareMute: hasHardwareMute)
-        #expect(device.isControllable == expected)
+        "Transport labels for the Devices tab",
+        arguments: [
+            (AudioDeviceInfo.Transport.builtIn, "Built-in"), (.bluetooth, "Bluetooth"), (.usb, "USB"), (.hdmi, "HDMI"),
+            (.displayPort, "DisplayPort"), (.airPlay, "AirPlay"), (.thunderbolt, "Thunderbolt"), (.virtual, "Virtual"),
+            (.aggregate, "Aggregate"), (.other, "Other")
+        ] as [(AudioDeviceInfo.Transport, String)])
+    func label(transport: AudioDeviceInfo.Transport, expected: String) {
+        #expect(transport.label == expected)
     }
 }

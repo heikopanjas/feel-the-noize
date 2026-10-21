@@ -57,9 +57,4 @@ struct AudioDeviceInfo: Equatable {
     /// Volume and mute describe the output; they are false for an input-only device.
     let canSetVolume: Bool
     let hasHardwareMute: Bool
-
-    /// Without volume the Dial can still mute through a hardware mute control; without either it can do nothing.
-    var isControllable: Bool {
-        canSetVolume || hasHardwareMute
-    }
 }

@@ -12,10 +12,6 @@ final class DialDevice: HapticFeedback {
     var onAccessDenied: (() -> Void)?
     private(set) var connection = DialConnection.notConnected
 
-    var isConnected: Bool {
-        connection == .connected
-    }
-
     /// Whether IOKit sees an awake Dial, adopted or not. Matching callbacks arrive asynchronously, so this is the only way
     /// to tell right after `start()` or a rebuild.
     var isPresent: Bool {
@@ -121,9 +117,8 @@ final class DialDevice: HapticFeedback {
         var buffer = [UInt8](repeating: 0, count: 8)
         var length = CFIndex(buffer.count)
         let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, CFIndex(DialReport.reportID), &buffer, &length)
-        Log.dial.debug(
-            "Keep-alive feature report read: \(Self.describe(result), privacy: .public), \(Self.hex(Array(buffer.prefix(length))), privacy: .public)"
-        )
+        let bytes = Self.hex(Array(buffer.prefix(length)))
+        Log.dial.debug("Keep-alive feature report read: \(Self.describe(result), privacy: .public), \(bytes, privacy: .public)")
         sendReport(kIOHIDReportTypeFeature, configurationReport(), to: device)
         sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
     }

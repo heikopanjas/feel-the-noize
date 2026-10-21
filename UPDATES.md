@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.5, review 1.5: dead API and small items)
+
+- `DialDevice.isConnected` (no caller) and `AudioDeviceInfo.isControllable` (used only by its own test) removed; `AudioDeviceInfoTests` checks the transport labels instead. `MenuDeviceRow.mouseUp` checks `isEnabled` like `MenuMuteRow`. The keep-alive log line in `DialDevice` is wrapped under the 147-column limit. Reason: `Docs/CODE_REVIEW.md` §2.7 and §2.8.
+- recorded in DESIGN.md: the synchronous battery read while the menu is open (§7.12), the `XCTestConfigurationFilePath` dependency of the test host and the main-actor default of the test target (§11.1); in `SettingsTests`: the process-wide registration domain.
+- version bump: 1.2.4 to 1.2.5 (PATCH - dead code removal, no user-visible change)
+
 ### 2026-10-22 (v1.2.4, review 1.4: one delayed action helper)
 
 - `Support/DelayedAction.swift` replaces the four hand-rolled "cancel the task, sleep, check cancellation, act" tasks: the end-stop Stop trigger and the HID rebuild in `DialDevice`, the rejected-write window in `AudioOutput` and the overlay fade in `VolumeOverlay`. It takes its sleep as an injected closure like `DialKeepAwake`, and `DelayedActionTests` drive it with `ManualSleeper`, which now keeps every unreleased sleep so a replaced timer can be released too. Reason: `Docs/CODE_REVIEW.md` §2.4; the overlay copy had already drifted (never cleared its task, checked cancellation but not `self`).

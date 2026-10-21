@@ -322,7 +322,7 @@ final class DialDevice: HapticFeedback {
     var onConnectionChange: ((DialConnection) -> Void)?
     var onAccessDenied: (() -> Void)?
     private(set) var connection: DialConnection
-    var isConnected: Bool { get }   // connection == .connected
+    var isPresent: Bool { get }   // IOKit sees an awake Dial, adopted or not
 
     func start()
     func stop()
@@ -471,7 +471,7 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 **Shared property access.** The Core Audio property helpers live in `CoreAudioProperty` (caseless enum): default output and input device read and write, device lookup by UID, device list, stream presence per scope, hidden flag, transport type, UID and name strings, settability, volume and mute read and write, and the shared `ListenerBlock` type. `AudioOutput` and `AudioDeviceList` both use it.
 
-**Device list.** `AudioDeviceList` lists the visible devices that have output or input streams as `AudioDeviceInfo` (UID, name, transport, `modelUID`, `outputDataSource`, `hasOutput`, `hasInput`, `canSetVolume`, `hasHardwareMute`, computed `isControllable`; volume and mute describe the output) plus the default output and default input UID. It listens to `kAudioHardwarePropertyDevices` and both default devices on the system object and reloads on any change. The Devices tab owns one, started in `viewWillAppear()` and stopped in `viewDidDisappear()`, and shows only devices with `hasOutput`; the status menu owns another while it is open (§7.11). No listener stays registered while both are closed.
+**Device list.** `AudioDeviceList` lists the visible devices that have output or input streams as `AudioDeviceInfo` (UID, name, transport, `modelUID`, `outputDataSource`, `hasOutput`, `hasInput`, `canSetVolume`, `hasHardwareMute`; volume and mute describe the output) plus the default output and default input UID. It listens to `kAudioHardwarePropertyDevices` and both default devices on the system object and reloads on any change. The Devices tab owns one, started in `viewWillAppear()` and stopped in `viewDidDisappear()`, and shows only devices with `hasOutput`; the status menu owns another while it is open (§7.11). No listener stays registered while both are closed.
 
 **Errors.** `CoreAudioError` and `OSStatus.throwIfError(_:)` are ported from Push to Hush (`CoreAudioSource.swift`), with the four-character-code rendering corrected to most-significant byte first. Failures are logged under the `audio` category; the cached state stays at the last confirmed value.
 
@@ -616,7 +616,7 @@ AirPods and most Classic Bluetooth headphones do not offer the Bluetooth Battery
 
 **Source.** `IOPSCopyPowerSourcesByType` is exported by IOKit but has no header, so it is looked up with `dlsym`; type 4 returns accessory power sources, decoded with the public `IOPSCopyPowerSourcesList` and `IOPSGetPowerSourceDescription`. Voltaic validated it on hardware: one in-process call covers AirPods with separate left, right and case cells as well as other Bluetooth accessories, with no permission prompt. Keys used: `Accessory Identifier` (Bluetooth address), `Group Identifier` (joins the parts of one AirPods), `Part Identifier` (`Left`, `Right`, `Case`), `Current Capacity`, `Name`. This is the only undeclared API in Feel the Noize, accepted because its failure only hides the battery text, the Dial's included (§7.10); if `dlsym` finds no symbol, the reader returns no levels and the menu shows none (R9).
 
-**Reading.** `AccessoryBattery.read()` (`Audio/AccessoryBattery.swift`) returns `Readings` with the audio accessories by address and the Dial level. `StatusItemController` calls it when the menu opens and again when the device list changes while it is open. No power source notification is registered, so it adds no idle work. Parts are grouped by `Group Identifier`, falling back to `Accessory Identifier`; sources without a Bluetooth address in their identifier, such as the Dial, are not audio accessories.
+**Reading.** `AccessoryBattery.read()` (`Audio/AccessoryBattery.swift`) returns `Readings` with the audio accessories by address and the Dial level. `StatusItemController` calls it when the menu opens and again when the device list changes while it is open. No power source notification is registered, so it adds no idle work. The call is a synchronous round trip to powerd on the main thread, a few milliseconds, accepted because it runs only while the menu is open (decided 2026-10-22, `Docs/CODE_REVIEW.md` §2.6); should it ever show in a trace, it moves to a `@concurrent` function awaited from a task. A missing power source list, which powerd returns while it restarts, yields no readings instead of a crash. Parts are grouped by `Group Identifier`, falling back to `Accessory Identifier`; sources without a Bluetooth address in their identifier, such as the Dial, are not audio accessories.
 
 **Matching.** A battery belongs to the Core Audio device whose UID carries the same Bluetooth address: `AccessoryBattery.address(in:)` finds six hex pairs separated by `-` or `:` and compares them as twelve uppercase hex digits. Verified for AirPods Max on 2026-10-21: Core Audio UIDs `70-F9-4A-A8-CE-BF:output` and `…:input`, power source `70:F9:4A:A8:CE:BF` (R10). Both Core Audio devices match, so the level shows in both sections.
 
@@ -761,7 +761,9 @@ Target `FeelTheNoizeTests`, added to `project.yml` in milestone M2. The `FeelThe
 
 `TEST_HOST` is set explicitly, because XcodeGen derives it from the target name `FeelTheNoize` while the app's product name is `Feel the Noize`.
 
-The tests run hosted in the app. `main.swift` detects the test host through the `XCTestConfigurationFilePath` environment variable and then does not install `AppDelegate`, so a test run neither seizes the Dial nor touches audio.
+The tests run hosted in the app. `main.swift` detects the test host through the `XCTestConfigurationFilePath` environment variable and then does not install `AppDelegate`, so a test run neither seizes the Dial nor touches audio. Swift Testing under `xcodebuild test` still launches the host through the XCTest harness, which sets that variable; if an Xcode release stops doing so, the first symptom is a test run that seizes the Dial, and the check needs another signal (for example a launch argument set in the scheme).
+
+The test target inherits `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` from the base settings in `project.yml`, so every suite and test runs on the main actor without annotation; that is why fixtures and closures that capture test-local `var`s compile without `@MainActor` or `Sendable` conformances.
 
 | Suite | Covers |
 |---|---|
@@ -774,7 +776,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 | `AccessoryBatteryTests` | address from Core Audio UIDs and power source identifiers, none from USB UIDs or UUIDs; single cell from the AirPods Max capture; AirPods parts grouped and ordered; sources without address, level or known part skipped; case left out while silent; Dial found by vendor and product ID |
 | `KeepChoicesTests` | keep popup choices: connected inputs sorted by name, an absent kept device as "(not connected)" with its remembered name or its UID |
 | `SettingsTests` | kept input off by default, round trip, stored empty for off, `onChange` only on change; input names remembered apart from outputs; defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
-| `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
+| `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, transport labels |
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
 | `DeviceIconTests` | slider symbol for headphones, speakers and no output; symbol per transport, direction, built-in name and data source, and Apple product ID; product ID parsing; every chosen symbol exists; circle image size, non-template, accessibility description, transparent corners |
 | `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |

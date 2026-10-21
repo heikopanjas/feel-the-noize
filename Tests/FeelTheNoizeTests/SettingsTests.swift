@@ -4,7 +4,9 @@ import Testing
 @testable import FeelTheNoize
 
 struct SettingsTests {
-    /// Runs the body against a private defaults domain, so nothing touches the app's real preferences.
+    /// Runs the body against a private defaults domain, so nothing touches the app's real preferences. The registration
+    /// domain is shared by every `UserDefaults` in the process, so `Settings.init` registers its defaults for `.standard`
+    /// as well; that is harmless here, because the test host never installs `AppDelegate`.
     private func withSettings(_ body: (Settings, UserDefaults) -> Void) {
         let suiteName = "com.panjas.FeelTheNoizeTests.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
