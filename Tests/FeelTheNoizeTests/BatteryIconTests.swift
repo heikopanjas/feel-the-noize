@@ -8,7 +8,7 @@ struct BatteryIconTests {
         "Fill follows the level, clamped, with a sliver for any charge",
         arguments: [(0, 0.0), (1, 0.08), (50, 0.5), (100, 1.0), (150, 1.0), (-5, 0.0)] as [(Int, Double)])
     func fill(level: Int, expected: Double) {
-        #expect(abs(Double(BatteryIcon.fillFraction(level: level)) - expected) < 0.0001)
+        expectClose(Double(BatteryIcon.fillFraction(level: level)), expected, tolerance: 0.0001)
     }
 
     @Test("Image has the measured size and draws ink", arguments: [5, 85])
@@ -28,6 +28,6 @@ struct BatteryIconTests {
         #expect(single.containsAttachments(in: NSRange(location: 0, length: single.length)))
         let parts = BatteryIcon.attributedText("L 80 %, R 75 %", level: nil)
         #expect(parts.string == "L 80 %, R 75 %")
-        #expect(!parts.containsAttachments(in: NSRange(location: 0, length: parts.length)))
+        #expect(parts.containsAttachments(in: NSRange(location: 0, length: parts.length)) == false)
     }
 }

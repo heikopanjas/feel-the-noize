@@ -8,8 +8,8 @@ struct VolumeWriteCheckTests {
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.51)
         check.finish()
-        #expect(!check.isRejected)
-        #expect(!check.isPending)
+        #expect(check.isRejected == false)
+        #expect(check.isPending == false)
     }
 
     @Test func snapBackAfterTheEchoIsRejected() {
@@ -40,7 +40,7 @@ struct VolumeWriteCheckTests {
         check.didRead(0.51)
         #expect(check.isRejected)
         check.finish()
-        #expect(!check.isRejected)
+        #expect(check.isRejected == false)
     }
 
     @Test func rejectedProbeKeepsTheRejection() {
@@ -64,6 +64,6 @@ struct VolumeWriteCheckTests {
         check.didRead(0.50)
         #expect(check.isRejected)
         check.didRead(0.60)
-        #expect(!check.isRejected)
+        #expect(check.isRejected == false)
     }
 }

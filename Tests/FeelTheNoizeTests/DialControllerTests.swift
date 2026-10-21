@@ -102,32 +102,32 @@ struct DialControllerTests {
     @Test func clockwiseStepsUp() {
         let fixture = Fixture()
         fixture.controller.handle(.rotated(detents: 1))
-        #expect(abs(fixture.volume() - 0.42) < Self.tolerance)
+        expectClose(fixture.volume(), 0.42, tolerance: Self.tolerance)
         #expect(fixture.adjustments.count == 1)
     }
 
     @Test func counterClockwiseStepsDown() {
         let fixture = Fixture()
         fixture.controller.handle(.rotated(detents: -1))
-        #expect(abs(fixture.volume() - 0.38) < Self.tolerance)
+        expectClose(fixture.volume(), 0.38, tolerance: Self.tolerance)
     }
 
     @Test func fastTurnStepsSeveralDetents() {
         let fixture = Fixture()
         fixture.controller.handle(.rotated(detents: 3))
-        #expect(abs(fixture.volume() - 0.46) < Self.tolerance)
+        expectClose(fixture.volume(), 0.46, tolerance: Self.tolerance)
     }
 
     @Test func stepPercentFromSettingsIsUsed() {
         let fixture = Fixture(settings: ControlSettings(stepPercent: 5, reverseDirection: false))
         fixture.controller.handle(.rotated(detents: 1))
-        #expect(abs(fixture.volume() - 0.45) < Self.tolerance)
+        expectClose(fixture.volume(), 0.45, tolerance: Self.tolerance)
     }
 
     @Test func reverseDirectionSwapsMeaning() {
         let fixture = Fixture(settings: ControlSettings(stepPercent: 2, reverseDirection: true))
         fixture.controller.handle(.rotated(detents: 1))
-        #expect(abs(fixture.volume() - 0.38) < Self.tolerance)
+        expectClose(fixture.volume(), 0.38, tolerance: Self.tolerance)
     }
 
     @Test func turnWhileMutedUnmutesFirst() {
@@ -135,7 +135,7 @@ struct DialControllerTests {
         fixture.controller.handle(.rotated(detents: 1))
         #expect(fixture.audio.muteWrites == [false])
         #expect(fixture.audio.state?.isMuted == false)
-        #expect(abs(fixture.volume() - 0.42) < Self.tolerance)
+        expectClose(fixture.volume(), 0.42, tolerance: Self.tolerance)
     }
 
     @Test func turnWhileEmulatedMutedStepsFromRestoredVolume() {
@@ -144,7 +144,7 @@ struct DialControllerTests {
         let fixture = Fixture(audio: audio)
         fixture.controller.handle(.rotated(detents: 1))
         #expect(fixture.audio.state?.isMuted == false)
-        #expect(abs(fixture.volume() - 0.42) < Self.tolerance)
+        expectClose(fixture.volume(), 0.42, tolerance: Self.tolerance)
     }
 
     @Test func rotationWithoutVolumeControlBuzzesInsteadOfWriting() {
@@ -176,7 +176,7 @@ struct DialControllerTests {
             fixture.clock.advance(by: .milliseconds(100))
         }
         #expect(fixture.audio.volumeWrites.count == 5)
-        #expect(abs(fixture.volume() - 0.50) < Self.tolerance)
+        expectClose(fixture.volume(), 0.50, tolerance: Self.tolerance)
         #expect(fixture.haptics.endStops == 1)
     }
 
@@ -224,7 +224,7 @@ struct DialControllerTests {
         fixture.controller.handle(.rotated(detents: 1))
         fixture.controller.handle(.rotated(detents: 1))
         fixture.controller.handle(.released)
-        #expect(abs(fixture.volume() - 0.41) < Self.tolerance)
+        expectClose(fixture.volume(), 0.41, tolerance: Self.tolerance)
         #expect(fixture.audio.muteWrites.isEmpty)
         #expect(fixture.haptics.muteToggles.isEmpty)
     }
@@ -270,7 +270,7 @@ struct DialControllerTests {
         fixture.controller.handle(.pressed)
         fixture.controller.handle(.released)
         #expect(fixture.audio.state?.isMuted == false)
-        #expect(abs(fixture.volume() - 0.40) < Self.tolerance)
+        expectClose(fixture.volume(), 0.40, tolerance: Self.tolerance)
     }
 
     // MARK: - Excluded Devices
@@ -324,7 +324,7 @@ struct DialControllerTests {
     @Test func otherDevicesAreUnaffectedByExclusions() {
         let fixture = Fixture(settings: ControlSettings(stepPercent: 2, reverseDirection: false, excludedDeviceUIDs: ["speakers"]))
         fixture.controller.handle(.rotated(detents: 1))
-        #expect(abs(fixture.volume() - 0.42) < Self.tolerance)
+        expectClose(fixture.volume(), 0.42, tolerance: Self.tolerance)
     }
 
     // MARK: - End Stop
@@ -369,6 +369,6 @@ struct DialControllerTests {
         let fixture = Fixture(audio: FakeAudio(volume: 1))
         fixture.controller.handle(.rotated(detents: 1))
         fixture.controller.handle(.rotated(detents: -1))
-        #expect(abs(fixture.volume() - 0.98) < Self.tolerance)
+        expectClose(fixture.volume(), 0.98, tolerance: Self.tolerance)
     }
 }

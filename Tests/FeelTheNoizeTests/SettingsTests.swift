@@ -60,7 +60,7 @@ struct SettingsTests {
             #expect(settings.excludedDeviceUIDs.isEmpty)
             #expect(settings.isDeviceEnabled("speakers"))
             settings.setDevice("speakers", enabled: false)
-            #expect(!settings.isDeviceEnabled("speakers"))
+            #expect(settings.isDeviceEnabled("speakers") == false)
             #expect(settings.isDeviceEnabled("airpods"))
             #expect(settings.controlSettings.excludedDeviceUIDs == ["speakers"])
             settings.setDevice("speakers", enabled: true)
@@ -94,12 +94,12 @@ struct SettingsTests {
 
     @Test func softwareVolumeIsOptInAndRespectsExclusion() {
         withSettings { settings, _ in
-            #expect(!settings.wantsSoftwareVolume("m2"))
+            #expect(settings.wantsSoftwareVolume("m2") == false)
             settings.setSoftwareVolume("m2", enabled: true)
             #expect(settings.softwareVolumeDeviceUIDs == ["m2"])
             #expect(settings.wantsSoftwareVolume("m2"))
             settings.setDevice("m2", enabled: false)
-            #expect(!settings.wantsSoftwareVolume("m2"))
+            #expect(settings.wantsSoftwareVolume("m2") == false)
             settings.setSoftwareVolume("m2", enabled: false)
             #expect(settings.softwareVolumeDeviceUIDs.isEmpty)
         }
@@ -111,7 +111,7 @@ struct SettingsTests {
             settings.onChange = { changes += 1 }
             #expect(settings.softwareVolumeLevel("m2") == 1)
             settings.setSoftwareVolumeLevel("m2", 0.42)
-            #expect(abs(settings.softwareVolumeLevel("m2") - 0.42) < 0.000_01)
+            expectClose(settings.softwareVolumeLevel("m2"), 0.42, tolerance: 0.000_01)
             #expect(settings.softwareVolumeLevel("other") == 1)
             #expect(changes == 0)
         }

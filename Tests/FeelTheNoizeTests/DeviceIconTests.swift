@@ -62,7 +62,7 @@ struct DeviceIconTests {
     @Test("Draws a circle of the menu size", arguments: [true, false])
     func image(isDefault: Bool) throws {
         let image = DeviceIcon.image(symbolName: "airpods.max", isDefault: isDefault, accessibilityDescription: "current output")
-        #expect(!image.isTemplate)
+        #expect(image.isTemplate == false)
         #expect(image.size == NSSize(width: DeviceIcon.diameter, height: DeviceIcon.diameter))
         #expect(image.accessibilityDescription == "current output")
         let rep = try #require(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))

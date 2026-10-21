@@ -767,7 +767,7 @@ The test target inherits `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` from the ba
 
 | Suite | Covers |
 |---|---|
-| `DialReportTests` | parsing both buffer shapes; clockwise `01 00 01 00 …` → +1; counter-clockwise `01 00 FF FF …` → −1; pressed `01 01 00 00 …`; wrong ID or length → `nil`; exact bytes of the feature report (36 detents, haptics on → `01 24 00 00 03 00 00 00`) and of the three manual patterns in §7.1 |
+| `DialReportTests` | parsing both buffer shapes; clockwise `01 00 01 00 …` → +1; counter-clockwise `01 00 FF FF …` → −1; pressed `01 01 00 00 …`; wrong ID or length → `nil`; exact bytes of the feature report (36 detents, haptics on → `01 24 00 00 03 00 00 00`), the multiplier clamped to 0…3600 and little-endian, and the three manual patterns in §7.1 |
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
 | `VolumeWriteCheckTests` | an accepted write, a snap-back after the echo, a fast spin returning to the volume before the first write, a probe that clears or keeps the rejection, a change from elsewhere |
 | `UserActivityTests` | declares at most once per interval, again after it, and keeps declaring after a failure |
@@ -777,6 +777,8 @@ The test target inherits `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` from the ba
 | `KeepChoicesTests` | keep popup choices: connected inputs sorted by name, an absent kept device as "(not connected)" with its remembered name or its UID |
 | `SettingsTests` | kept input off by default, round trip, stored empty for off, `onChange` only on change; input names remembered apart from outputs; defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
 | `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, transport labels |
+| `CoreAudioErrorTests` | four-character codes rendered as such, other statuses as unknown; `throwIfError` passes `noErr` and throws the status with its operation |
+| `VolumePresentationTests` | percent text rounding; the accessibility description for no device, adjustable, muted, not adjustable and in use elsewhere; the knob image is a template of the requested size |
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
 | `DeviceIconTests` | slider symbol for headphones, speakers and no output; symbol per transport, direction, built-in name and data source, and Apple product ID; product ID parsing; every chosen symbol exists; circle image size, non-template, accessibility description, transparent corners |
 | `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |

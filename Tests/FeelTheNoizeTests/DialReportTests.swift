@@ -65,9 +65,11 @@ struct DialReportTests {
             DialReport.hapticConfiguration(detentsPerRevolution: 72, hapticsEnabled: false) == [0x01, 0x48, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00])
     }
 
-    @Test func resolutionMultiplierIsLittleEndianAndClamped() {
-        #expect(DialReport.hapticConfiguration(detentsPerRevolution: 3600, hapticsEnabled: true)[1 ... 2] == [0x10, 0x0E])
-        #expect(DialReport.hapticConfiguration(detentsPerRevolution: 5000, hapticsEnabled: true)[1 ... 2] == [0x10, 0x0E])
+    @Test(
+        "Resolution multiplier is little-endian and clamped to 0...3600",
+        arguments: [(3600, [0x10, 0x0E]), (5000, [0x10, 0x0E]), (-5, [0x00, 0x00]), (256, [0x00, 0x01])] as [(Int, [UInt8])])
+    func resolutionMultiplier(detents: Int, expected: [UInt8]) {
+        #expect(Array(DialReport.hapticConfiguration(detentsPerRevolution: detents, hapticsEnabled: true)[1 ... 2]) == expected)
     }
 
     // MARK: - Manual Triggers

@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.6, review 2.1 to 2.3: test hygiene and pure tests)
+
+- every `#expect(!x)` became `#expect(x == false)`, so a failure prints the value; float comparisons go through `expectClose(_:_:tolerance:)` (`Tests/FeelTheNoizeTests/Fixtures/Expectations.swift`), which reports both values at the caller's line. Reason: `Docs/CODE_REVIEW.md` §4.1 and §4.5 (swift-testing-pro: `!` defeats the macro's diagnostics).
+- new `VolumePresentationTests` and `CoreAudioErrorTests`; the resolution multiplier test gained the negative clamp and a two-byte value; `KnobIconTests.drawsInk` is parameterized over style and mute state so a failure names the case. Reason: §4.4 and §4.5.
+- version bump: 1.2.5 to 1.2.6 (PATCH - tests only)
+
 ### 2026-10-22 (v1.2.5, review 1.5: dead API and small items)
 
 - `DialDevice.isConnected` (no caller) and `AudioDeviceInfo.isControllable` (used only by its own test) removed; `AudioDeviceInfoTests` checks the transport labels instead. `MenuDeviceRow.mouseUp` checks `isEnabled` like `MenuMuteRow`. The keep-alive log line in `DialDevice` is wrapped under the 147-column limit. Reason: `Docs/CODE_REVIEW.md` §2.7 and §2.8.
