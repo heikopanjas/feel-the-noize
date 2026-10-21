@@ -1,15 +1,13 @@
-# ⚠️ SESSION NOT INITIALIZED PROPERLY
+# Project Instructions
 
-If you're reading this, the user probably forgot to run `/init-session`.
+This project's instructions live in **AGENTS.md**.
 
-**STOP IMMEDIATELY and ask:**
-"Should I run /init-session first to properly initialize this session?"
+**Read `AGENTS.md` before doing anything else.** It is the single source of truth
+for all agents.
 
-If the user confirms, run the slash command. If they say no, then:
-- READ AGENTS.md
-- Proceed with their request
+## ⚠️ Before You Start
 
-DO NOT proceed with commits or code changes without either:
-  1. Running /init-session, OR
-  2. Reading AGENTS.md
+Run `/init-session` at the beginning of each new session, OR read `AGENTS.md` in full
+before proceeding.
 
+**DO NOT** make code changes or commits until you have done one of the above.
