@@ -10,10 +10,12 @@ final class VolumeSlider: NSSlider {
 
     /// SF Symbol drawn at the left end; set by the menu for the current output.
     var symbolName: String {
-        get { drawingCell.symbolName }
+        get {
+            return self.drawingCell.symbolName
+        }
         set {
-            drawingCell.symbolName = newValue
-            needsDisplay = true
+            self.drawingCell.symbolName = newValue
+            self.needsDisplay = true
         }
     }
 
@@ -21,19 +23,19 @@ final class VolumeSlider: NSSlider {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        cell = drawingCell
-        minValue = 0
-        maxValue = 1
-        isContinuous = true
+        self.cell = self.drawingCell
+        self.minValue = 0
+        self.maxValue = 1
+        self.isContinuous = true
     }
 
     required init?(coder: NSCoder) {
-        nil
+        return nil
     }
 
     /// Menus draw item views over a vibrant material, which would wash out the measured colors.
     override var allowsVibrancy: Bool {
-        false
+        return false
     }
 
     // MARK: - Cell
@@ -43,8 +45,8 @@ final class VolumeSlider: NSSlider {
         private static let glyphPointSize: CGFloat = 11
         private static let borderWidth: CGFloat = 1
         private static let disabledAlpha: CGFloat = 0.5
-        private static let trackColor = dynamicColor(light: 0xD8, dark: 0x4A)
-        private static let borderColor = dynamicColor(light: 0xC6, dark: 0x60)
+        private static let trackColor = Cell.dynamicColor(light: 0xD8, dark: 0x4A)
+        private static let borderColor = Cell.dynamicColor(light: 0xC6, dark: 0x60)
         /// The left end is always white, under the fill or the knob, so the glyph color does not depend on the appearance.
         private static let glyphColor = NSColor(white: 0xB8 / 255, alpha: 1)
         private static let knobEdgeAlpha: CGFloat = 0.18
@@ -53,29 +55,29 @@ final class VolumeSlider: NSSlider {
         var symbolName = "speaker.wave.2.fill"
 
         override var knobThickness: CGFloat {
-            VolumeSlider.trackHeight
+            return VolumeSlider.trackHeight
         }
 
         override func barRect(flipped: Bool) -> NSRect {
-            let bounds = controlView?.bounds ?? .zero
+            let bounds = self.controlView?.bounds ?? .zero
             return NSRect(x: bounds.minX, y: bounds.midY - VolumeSlider.trackHeight / 2, width: bounds.width, height: VolumeSlider.trackHeight)
         }
 
         override func knobRect(flipped: Bool) -> NSRect {
-            let bar = barRect(flipped: flipped)
-            let range = maxValue - minValue
-            let fraction = range > 0 ? CGFloat((doubleValue - minValue) / range) : 0
+            let bar = self.barRect(flipped: flipped)
+            let range = self.maxValue - self.minValue
+            let fraction = range > 0 ? CGFloat((self.doubleValue - self.minValue) / range) : 0
             return NSRect(x: bar.minX + (bar.width - bar.height) * fraction, y: bar.minY, width: bar.height, height: bar.height)
         }
 
-        override func drawBar(inside rect: NSRect, flipped: Bool) {
-            let bar = barRect(flipped: flipped)
+        override func drawBar(inside rect: NSRect, flipped: Bool) -> Void {
+            let bar = self.barRect(flipped: flipped)
             let radius = bar.height / 2
-            let alpha = isEnabled ? 1 : Self.disabledAlpha
+            let alpha = self.isEnabled == true ? 1 : Self.disabledAlpha
             Self.trackColor.withAlphaComponent(alpha).setFill()
             NSBezierPath(roundedRect: bar, xRadius: radius, yRadius: radius).fill()
 
-            let fill = NSRect(x: bar.minX, y: bar.minY, width: knobRect(flipped: flipped).maxX - bar.minX, height: bar.height)
+            let fill = NSRect(x: bar.minX, y: bar.minY, width: self.knobRect(flipped: flipped).maxX - bar.minX, height: bar.height)
             NSColor.white.withAlphaComponent(alpha).setFill()
             NSBezierPath(roundedRect: fill, xRadius: radius, yRadius: radius).fill()
 
@@ -88,8 +90,8 @@ final class VolumeSlider: NSSlider {
         }
 
         /// The symbol is drawn after the knob, so it stays visible when the knob covers the left end at low volume.
-        override func drawKnob(_ knobRect: NSRect) {
-            let alpha = isEnabled ? 1 : Self.disabledAlpha
+        override func drawKnob(_ knobRect: NSRect) -> Void {
+            let alpha = self.isEnabled == true ? 1 : Self.disabledAlpha
             let knob = NSBezierPath(ovalIn: knobRect.insetBy(dx: 0.5, dy: 0.5))
             NSGraphicsContext.saveGraphicsState()
             let shadow = NSShadow()
@@ -104,24 +106,25 @@ final class VolumeSlider: NSSlider {
             NSColor.black.withAlphaComponent(Self.knobEdgeAlpha * alpha).setStroke()
             knob.stroke()
 
-            drawSymbol(alpha: alpha)
+            self.drawSymbol(alpha: alpha)
         }
 
-        private func drawSymbol(alpha: CGFloat) {
-            let bar = barRect(flipped: controlView?.isFlipped ?? false)
+        private func drawSymbol(alpha: CGFloat) -> Void {
+            let bar = self.barRect(flipped: self.controlView?.isFlipped ?? false)
             let configuration = NSImage.SymbolConfiguration(pointSize: Self.glyphPointSize, weight: .regular)
                 .applying(NSImage.SymbolConfiguration(hierarchicalColor: Self.glyphColor.withAlphaComponent(alpha)))
-            guard let glyph = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
-            else { return }
-            let size = glyph.size
-            let center = NSPoint(x: bar.minX + bar.height / 2, y: bar.midY)
-            glyph.draw(in: NSRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height))
+            if let glyph = NSImage(systemSymbolName: self.symbolName, accessibilityDescription: nil)?.withSymbolConfiguration(configuration) {
+                let size = glyph.size
+                let center = NSPoint(x: bar.minX + bar.height / 2, y: bar.midY)
+                glyph.draw(in: NSRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height))
+            }
         }
 
+        // The type name rather than `Self`: a static stored property initializer cannot refer to `Self`.
         private static func dynamicColor(light: Int, dark: Int) -> NSColor {
-            NSColor(name: nil) { appearance in
+            return NSColor(name: nil) { appearance in
                 let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                return NSColor(white: CGFloat(isDark ? dark : light) / 255, alpha: 1)
+                return NSColor(white: CGFloat(isDark == true ? dark : light) / 255, alpha: 1)
             }
         }
     }

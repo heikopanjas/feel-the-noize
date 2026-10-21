@@ -13,17 +13,19 @@ final class MenuInfoRow: NSView {
 
     var text = "" {
         didSet {
-            label.stringValue = text
-            layoutRow()
+            self.label.stringValue = self.text
+            self.layoutRow()
         }
     }
 
     /// Shows "85 %" and a battery symbol at the right edge; `nil` hides both.
     var batteryLevel: Int? {
         didSet {
-            guard batteryLevel != oldValue else { return }
-            updateBattery()
-            layoutRow()
+            guard self.batteryLevel != oldValue else {
+                return
+            }
+            self.updateBattery()
+            self.layoutRow()
         }
     }
 
@@ -33,42 +35,43 @@ final class MenuInfoRow: NSView {
 
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Self.height))
-        autoresizingMask = [.width]
-        for field in [label, batteryLabel] {
+        self.autoresizingMask = [.width]
+        for field in [self.label, self.batteryLabel] {
             field.font = Self.font
             field.textColor = .secondaryLabelColor
-            addSubview(field)
+            self.addSubview(field)
         }
-        label.lineBreakMode = .byTruncatingTail
-        label.autoresizingMask = [.width]
-        batteryLabel.autoresizingMask = [.minXMargin]
-        updateBattery()
-        layoutRow()
+        self.label.lineBreakMode = .byTruncatingTail
+        self.label.autoresizingMask = [.width]
+        self.batteryLabel.autoresizingMask = [.minXMargin]
+        self.updateBattery()
+        self.layoutRow()
     }
 
     required init?(coder: NSCoder) {
-        nil
+        return nil
     }
 
-    private func updateBattery() {
-        batteryLabel.isHidden = batteryLevel == nil
-        guard let batteryLevel else { return }
-        batteryLabel.attributedStringValue = BatteryIcon.attributedText("\(batteryLevel) %", level: batteryLevel)
+    private func updateBattery() -> Void {
+        self.batteryLabel.isHidden = self.batteryLevel == nil
+        if let batteryLevel = self.batteryLevel {
+            self.batteryLabel.attributedStringValue = BatteryIcon.attributedText("\(batteryLevel) %", level: batteryLevel)
+        }
     }
 
     /// Sets the natural width, which the menu uses to size itself, and places the parts from both edges.
-    private func layoutRow() {
-        label.sizeToFit()
-        batteryLabel.sizeToFit()
-        let batteryWidth = batteryLevel == nil ? 0 : Self.batterySpacing + batteryLabel.frame.width
-        let width = Self.inset + label.frame.width + batteryWidth + Self.inset
-        frame.size.width = max(frame.width, width)
+    private func layoutRow() -> Void {
+        self.label.sizeToFit()
+        self.batteryLabel.sizeToFit()
+        let batteryWidth = self.batteryLevel == nil ? 0 : Self.batterySpacing + self.batteryLabel.frame.width
+        let width = Self.inset + self.label.frame.width + batteryWidth + Self.inset
+        self.frame.size.width = max(self.frame.width, width)
 
-        let midY = bounds.midY
-        batteryLabel.setFrameOrigin(
-            NSPoint(x: bounds.maxX - Self.inset - batteryLabel.frame.width, y: midY - batteryLabel.frame.height / 2))
-        let labelRight = batteryLevel == nil ? bounds.maxX - Self.inset : batteryLabel.frame.minX - Self.batterySpacing
-        label.frame = NSRect(
-            x: Self.inset, y: midY - label.frame.height / 2, width: max(labelRight - Self.inset, 0), height: label.frame.height)
+        let midY = self.bounds.midY
+        self.batteryLabel.setFrameOrigin(
+            NSPoint(x: self.bounds.maxX - Self.inset - self.batteryLabel.frame.width, y: midY - self.batteryLabel.frame.height / 2))
+        let labelRight = self.batteryLevel == nil ? self.bounds.maxX - Self.inset : self.batteryLabel.frame.minX - Self.batterySpacing
+        self.label.frame = NSRect(
+            x: Self.inset, y: midY - self.label.frame.height / 2, width: max(labelRight - Self.inset, 0), height: self.label.frame.height)
     }
 }

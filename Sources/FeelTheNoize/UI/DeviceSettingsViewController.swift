@@ -24,23 +24,35 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
 
         var title: String {
             switch self {
-                case .use: "Use"
-                case .device: "Device"
-                case .connection: "Connection"
-                case .volume: "Volume Control"
-                case .mute: "Mute"
-                case .software: "Software Volume"
+                case .use:
+                    return "Use"
+                case .device:
+                    return "Device"
+                case .connection:
+                    return "Connection"
+                case .volume:
+                    return "Volume Control"
+                case .mute:
+                    return "Mute"
+                case .software:
+                    return "Software Volume"
             }
         }
 
         var width: CGFloat {
             switch self {
-                case .use: 36
-                case .device: 200
-                case .connection: 100
-                case .volume: 100
-                case .mute: 70
-                case .software: 110
+                case .use:
+                    return 36
+                case .device:
+                    return 200
+                case .connection:
+                    return 100
+                case .volume:
+                    return 100
+                case .mute:
+                    return 70
+                case .software:
+                    return 110
             }
         }
     }
@@ -58,32 +70,32 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     init(settings: Settings) {
         self.settings = settings
         super.init(nibName: nil, bundle: nil)
-        title = "Devices"
+        self.title = "Devices"
     }
 
     required init?(coder: NSCoder) {
-        nil
+        return nil
     }
 
-    override func loadView() {
+    override func loadView() -> Void {
         for column in Column.allCases {
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.rawValue))
             tableColumn.title = column.title
             tableColumn.width = column.width
             tableColumn.minWidth = column.width
-            tableView.addTableColumn(tableColumn)
+            self.tableView.addTableColumn(tableColumn)
         }
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.usesAlternatingRowBackgroundColors = true
-        tableView.selectionHighlightStyle = .none
-        tableView.allowsColumnReordering = false
-        tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        tableView.style = .fullWidth
-        tableView.rowHeight = 22
+        self.tableView.dataSource = self
+        self.tableView.delegate = self
+        self.tableView.usesAlternatingRowBackgroundColors = true
+        self.tableView.selectionHighlightStyle = .none
+        self.tableView.allowsColumnReordering = false
+        self.tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        self.tableView.style = .fullWidth
+        self.tableView.rowHeight = 22
 
         let scrollView = NSScrollView()
-        scrollView.documentView = tableView
+        scrollView.documentView = self.tableView
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .bezelBorder
 
@@ -96,10 +108,10 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
         footnote.textColor = .secondaryLabelColor
 
         let keepLabel = NSTextField(labelWithString: "Keep input device:")
-        keepPopup.target = self
-        keepPopup.action = #selector(keepInputChanged(_:))
-        keepPopup.setAccessibilityLabel("Keep input device")
-        let keepRow = NSStackView(views: [keepLabel, keepPopup])
+        self.keepPopup.target = self
+        self.keepPopup.action = #selector(self.keepInputChanged(_:))
+        self.keepPopup.setAccessibilityLabel("Keep input device")
+        let keepRow = NSStackView(views: [keepLabel, self.keepPopup])
         keepRow.spacing = 8
         let keepFootnote = NSTextField(
             wrappingLabelWithString:
@@ -129,67 +141,67 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
             keepFootnote.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             keepFootnote.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.margin)
         ])
-        view = container
-        preferredContentSize = Self.contentSize
+        self.view = container
+        self.preferredContentSize = Self.contentSize
 
-        deviceList.onChange = { [weak self] in
+        self.deviceList.onChange = { [weak self] in
             self?.deviceListChanged()
         }
     }
 
-    override func viewWillAppear() {
+    override func viewWillAppear() -> Void {
         super.viewWillAppear()
-        deviceList.start()
+        self.deviceList.start()
     }
 
-    override func viewDidDisappear() {
+    override func viewDidDisappear() -> Void {
         super.viewDidDisappear()
-        deviceList.stop()
+        self.deviceList.stop()
     }
 
     // MARK: - Rows
 
-    private func deviceListChanged() {
+    private func deviceListChanged() -> Void {
         // The list also carries inputs for the status menu; this tab is about outputs only.
-        let connected = deviceList.devices.filter(\.hasOutput)
-        settings.rememberDevices(Dictionary(connected.map { ($0.uid, $0.name) }, uniquingKeysWith: { first, _ in first }))
+        let connected = self.deviceList.devices.filter(\.hasOutput)
+        self.settings.rememberDevices(Dictionary(connected.map { ($0.uid, $0.name) }, uniquingKeysWith: { first, _ in first }))
 
         let connectedUIDs = Set(connected.map(\.uid))
         let connectedRows = connected.map { device in
-            Row(uid: device.uid, name: device.name, device: device, isDefaultOutput: device.uid == deviceList.defaultOutputUID)
+            return Row(uid: device.uid, name: device.name, device: device, isDefaultOutput: device.uid == self.deviceList.defaultOutputUID)
         }
-        let rememberedRows = settings.knownDevices.filter { !connectedUIDs.contains($0.key) }.map { uid, name in
-            Row(uid: uid, name: name, device: nil, isDefaultOutput: false)
+        let rememberedRows = self.settings.knownDevices.filter { connectedUIDs.contains($0.key) == false }.map { uid, name in
+            return Row(uid: uid, name: name, device: nil, isDefaultOutput: false)
         }
-        rows = Self.sortedByName(connectedRows) + Self.sortedByName(rememberedRows)
-        tableView.reloadData()
+        self.rows = Self.sortedByName(connectedRows) + Self.sortedByName(rememberedRows)
+        self.tableView.reloadData()
 
-        let inputs = deviceList.devices.filter(\.hasInput)
-        settings.rememberInputDevices(Dictionary(inputs.map { ($0.uid, $0.name) }, uniquingKeysWith: { first, _ in first }))
-        rebuildKeepPopup(inputs: inputs)
+        let inputs = self.deviceList.devices.filter(\.hasInput)
+        self.settings.rememberInputDevices(Dictionary(inputs.map { ($0.uid, $0.name) }, uniquingKeysWith: { first, _ in first }))
+        self.rebuildKeepPopup(inputs: inputs)
     }
 
     // MARK: - Kept Input
 
-    private func rebuildKeepPopup(inputs: [AudioDeviceInfo]) {
-        let keptUID = settings.keptInputDeviceUID
-        keepPopup.removeAllItems()
+    private func rebuildKeepPopup(inputs: [AudioDeviceInfo]) -> Void {
+        let keptUID = self.settings.keptInputDeviceUID
+        self.keepPopup.removeAllItems()
         let off = NSMenuItem(title: Self.offTitle, action: nil, keyEquivalent: "")
-        keepPopup.menu?.addItem(off)
-        let choices = Self.keepChoices(inputs: inputs, keptUID: keptUID, knownNames: settings.knownInputDevices)
-        if !choices.isEmpty {
-            keepPopup.menu?.addItem(.separator())
+        self.keepPopup.menu?.addItem(off)
+        let choices = Self.keepChoices(inputs: inputs, keptUID: keptUID, knownNames: self.settings.knownInputDevices)
+        if choices.isEmpty == false {
+            self.keepPopup.menu?.addItem(.separator())
         }
         for choice in choices {
             let item = NSMenuItem(title: choice.title, action: nil, keyEquivalent: "")
             item.representedObject = choice.uid
-            keepPopup.menu?.addItem(item)
+            self.keepPopup.menu?.addItem(item)
             if choice.uid == keptUID {
-                keepPopup.select(item)
+                self.keepPopup.select(item)
             }
         }
         if keptUID == nil {
-            keepPopup.select(off)
+            self.keepPopup.select(off)
         }
     }
 
@@ -197,63 +209,73 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     /// still show it.
     static func keepChoices(inputs: [AudioDeviceInfo], keptUID: String?, knownNames: [String: String]) -> [(uid: String, title: String)] {
         let connected = inputs.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }.map { (uid: $0.uid, title: $0.name) }
-        guard let keptUID, !connected.contains(where: { $0.uid == keptUID }) else { return connected }
-        return connected + [(uid: keptUID, title: "\(knownNames[keptUID] ?? keptUID) (not connected)")]
+        if let keptUID = keptUID {
+            if connected.contains(where: { $0.uid == keptUID }) == false {
+                return connected + [(uid: keptUID, title: "\(knownNames[keptUID] ?? keptUID) (not connected)")]
+            }
+        }
+        return connected
     }
 
     private static func sortedByName(_ rows: [Row]) -> [Row] {
-        rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     // MARK: - Table
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        rows.count
+        return self.rows.count
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row index: Int) -> NSView? {
-        guard let identifier = tableColumn?.identifier, let column = Column(rawValue: identifier.rawValue), rows.indices.contains(index) else {
+        guard let identifier = tableColumn?.identifier else {
             return nil
         }
-        let row = rows[index]
+        guard let column = Column(rawValue: identifier.rawValue) else {
+            return nil
+        }
+        guard self.rows.indices.contains(index) else {
+            return nil
+        }
+        let row = self.rows[index]
         switch column {
             case .use:
-                return useCheckbox(for: row, at: index)
+                return self.useCheckbox(for: row, at: index)
             case .device:
-                return deviceCell(for: row)
+                return self.deviceCell(for: row)
             case .connection:
-                return textCell(row.device?.transport.label ?? "Not connected", row: row)
+                return self.textCell(row.device?.transport.label ?? "Not connected", row: row)
             case .volume:
-                return textCell(row.device.map { $0.canSetVolume ? "Yes" : "No" } ?? "–", row: row)
+                return self.textCell(row.device.map { $0.canSetVolume == true ? "Yes" : "No" } ?? "–", row: row)
             case .mute:
-                return textCell(row.device.map(Self.muteLabel) ?? "–", row: row)
+                return self.textCell(row.device.map(Self.muteLabel) ?? "–", row: row)
             case .software:
-                return softwareVolumeCheckbox(for: row, at: index)
+                return self.softwareVolumeCheckbox(for: row, at: index)
         }
     }
 
     private func useCheckbox(for row: Row, at index: Int) -> NSView {
-        let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleDevice(_:)))
+        let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(self.toggleDevice(_:)))
         checkbox.tag = index
         // Every device can be selected: one without volume control can still get software volume.
-        checkbox.state = settings.isDeviceEnabled(row.uid) ? .on : .off
+        checkbox.state = self.settings.isDeviceEnabled(row.uid) == true ? .on : .off
         checkbox.setAccessibilityLabel("Use \(row.name)")
         return Self.centered(checkbox)
     }
 
     private func softwareVolumeCheckbox(for row: Row, at index: Int) -> NSView {
-        let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleSoftwareVolume(_:)))
+        let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(self.toggleSoftwareVolume(_:)))
         checkbox.tag = index
         // Only for connected devices without volume control; remembered devices show their stored choice.
-        checkbox.isEnabled = row.device.map { !$0.canSetVolume } ?? false
-        checkbox.state = settings.softwareVolumeDeviceUIDs.contains(row.uid) ? .on : .off
+        checkbox.isEnabled = row.device.map { $0.canSetVolume == false } ?? false
+        checkbox.state = self.settings.softwareVolumeDeviceUIDs.contains(row.uid) == true ? .on : .off
         checkbox.setAccessibilityLabel("Software volume for \(row.name)")
         return Self.centered(checkbox)
     }
 
     private func deviceCell(for row: Row) -> NSView {
         let marker = NSImageView()
-        if row.isDefaultOutput {
+        if row.isDefaultOutput == true {
             marker.image = NSImage(systemSymbolName: "speaker.wave.2.fill", accessibilityDescription: "Current output")
             marker.contentTintColor = .controlAccentColor
             marker.toolTip = "Current output"
@@ -268,7 +290,7 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     }
 
     private func textCell(_ text: String, row: Row) -> NSView {
-        Self.leadingCentered(Self.label(text, row: row))
+        return Self.leadingCentered(Self.label(text, row: row))
     }
 
     private static func label(_ text: String, row: Row) -> NSTextField {
@@ -302,26 +324,30 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     }
 
     private static func muteLabel(_ device: AudioDeviceInfo) -> String {
-        if device.hasHardwareMute {
+        if device.hasHardwareMute == true {
             return "Yes"
         }
         // AudioOutput emulates mute through the volume when the device has no mute control (§7.4).
-        return device.canSetVolume ? "Emulated" : "No"
+        return device.canSetVolume == true ? "Emulated" : "No"
     }
 
     // MARK: - Actions
 
-    @objc private func toggleDevice(_ sender: NSButton) {
-        guard rows.indices.contains(sender.tag) else { return }
-        settings.setDevice(rows[sender.tag].uid, enabled: sender.state == .on)
+    @objc private func toggleDevice(_ sender: NSButton) -> Void {
+        guard self.rows.indices.contains(sender.tag) else {
+            return
+        }
+        self.settings.setDevice(self.rows[sender.tag].uid, enabled: sender.state == .on)
     }
 
-    @objc private func keepInputChanged(_ sender: NSPopUpButton) {
-        settings.keptInputDeviceUID = sender.selectedItem?.representedObject as? String
+    @objc private func keepInputChanged(_ sender: NSPopUpButton) -> Void {
+        self.settings.keptInputDeviceUID = sender.selectedItem?.representedObject as? String
     }
 
-    @objc private func toggleSoftwareVolume(_ sender: NSButton) {
-        guard rows.indices.contains(sender.tag) else { return }
-        settings.setSoftwareVolume(rows[sender.tag].uid, enabled: sender.state == .on)
+    @objc private func toggleSoftwareVolume(_ sender: NSButton) -> Void {
+        guard self.rows.indices.contains(sender.tag) else {
+            return
+        }
+        self.settings.setSoftwareVolume(self.rows[sender.tag].uid, enabled: sender.state == .on)
     }
 }

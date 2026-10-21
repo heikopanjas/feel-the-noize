@@ -16,9 +16,11 @@ final class MenuMuteRow: NSView {
 
     var isMuted = false {
         didSet {
-            guard isMuted != oldValue else { return }
-            setAccessibilityLabel(Self.title(isMuted: isMuted))
-            needsDisplay = true
+            guard self.isMuted != oldValue else {
+                return
+            }
+            self.setAccessibilityLabel(Self.title(isMuted: self.isMuted))
+            self.needsDisplay = true
         }
     }
 
@@ -29,51 +31,74 @@ final class MenuMuteRow: NSView {
             [false, true].map { NSAttributedString(string: Self.title(isMuted: $0), attributes: [.font: Self.font]).size().width }
             .max() ?? 0
         let inset = MenuInfoRow.inset
-        frame = NSRect(x: 0, y: 0, width: ceil(inset + titleWidth + Self.symbolGap + Self.symbolPointSize * 1.5 + inset), height: Self.height)
-        autoresizingMask = [.width]
-        setAccessibilityElement(true)
-        setAccessibilityRole(.menuItem)
-        setAccessibilityLabel(Self.title(isMuted: false))
+        self.frame = NSRect(x: 0, y: 0, width: ceil(inset + titleWidth + Self.symbolGap + Self.symbolPointSize * 1.5 + inset), height: Self.height)
+        self.autoresizingMask = [.width]
+        self.setAccessibilityElement(true)
+        self.setAccessibilityRole(.menuItem)
+        self.setAccessibilityLabel(Self.title(isMuted: false))
     }
 
     required init?(coder: NSCoder) {
-        nil
+        return nil
     }
 
     static func title(isMuted: Bool) -> String {
-        isMuted ? "Unmute" : "Mute"
+        return isMuted == true ? "Unmute" : "Mute"
     }
 
     // MARK: - Drawing
 
-    override func draw(_ dirtyRect: NSRect) {
-        let item = enclosingMenuItem
+    override func draw(_ dirtyRect: NSRect) -> Void {
+        let item = self.enclosingMenuItem
         let isEnabled = item?.isEnabled ?? true
-        let isHighlighted = isEnabled && item?.isHighlighted == true
-        if isHighlighted {
+        let isHighlighted = isEnabled == true && item?.isHighlighted == true
+        if isHighlighted == true {
             NSColor.controlAccentColor.setFill()
-            let rect = bounds.insetBy(dx: Self.highlightInset, dy: 0)
+            let rect = self.bounds.insetBy(dx: Self.highlightInset, dy: 0)
             NSBezierPath(roundedRect: rect, xRadius: Self.highlightRadius, yRadius: Self.highlightRadius).fill()
         }
-        let textColor: NSColor = isHighlighted ? .selectedMenuItemTextColor : isEnabled ? .labelColor : .tertiaryLabelColor
-        let title = NSAttributedString(string: Self.title(isMuted: isMuted), attributes: [.font: Self.font, .foregroundColor: textColor])
+        let textColor: NSColor
+        let symbolColor: NSColor
+        if isHighlighted == true {
+            textColor = .selectedMenuItemTextColor
+            symbolColor = .selectedMenuItemTextColor
+        }
+        else if isEnabled == true {
+            textColor = .labelColor
+            symbolColor = .secondaryLabelColor
+        }
+        else {
+            textColor = .tertiaryLabelColor
+            symbolColor = .tertiaryLabelColor
+        }
+        let title = NSAttributedString(string: Self.title(isMuted: self.isMuted), attributes: [.font: Self.font, .foregroundColor: textColor])
         let titleSize = title.size()
-        title.draw(at: NSPoint(x: MenuInfoRow.inset, y: bounds.midY - titleSize.height / 2))
+        title.draw(at: NSPoint(x: MenuInfoRow.inset, y: self.bounds.midY - titleSize.height / 2))
 
-        let symbolColor: NSColor = isHighlighted ? .selectedMenuItemTextColor : isEnabled ? .secondaryLabelColor : .tertiaryLabelColor
         let configuration = NSImage.SymbolConfiguration(pointSize: Self.symbolPointSize, weight: .regular)
             .applying(NSImage.SymbolConfiguration(hierarchicalColor: symbolColor))
-        let name = isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill"
-        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
-        else { return }
-        let size = symbol.size
-        symbol.draw(
-            in: NSRect(x: bounds.maxX - MenuInfoRow.inset - size.width, y: bounds.midY - size.height / 2, width: size.width, height: size.height))
+        let name = self.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        if let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration) {
+            let size = symbol.size
+            let origin = NSPoint(x: self.bounds.maxX - MenuInfoRow.inset - size.width, y: self.bounds.midY - size.height / 2)
+            symbol.draw(in: NSRect(origin: origin, size: size))
+        }
     }
 
     /// A view-based item does not send its action by itself.
-    override func mouseUp(with event: NSEvent) {
-        guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu, let action = item.action else { return }
+    override func mouseUp(with event: NSEvent) -> Void {
+        guard let item = self.enclosingMenuItem else {
+            return
+        }
+        guard item.isEnabled == true else {
+            return
+        }
+        guard let menu = item.menu else {
+            return
+        }
+        guard let action = item.action else {
+            return
+        }
         menu.cancelTracking()
         NSApp.sendAction(action, to: item.target, from: item)
     }

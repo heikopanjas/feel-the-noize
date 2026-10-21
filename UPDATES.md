@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.13, review 3.5: UI and app to the Swift skill)
+
+- `StatusItemController`, `VolumeOverlay`, `SettingsWindowController`, `GeneralSettingsViewController`, `DeviceSettingsViewController`, `VolumeSlider`, `MenuInfoRow`, `MenuMuteRow`, `MenuDeviceRow`, `AppDelegate` and `main.swift` rewritten to the swift-coding-conventions skill. Helpers split out so every guard is first in its function: `StatusItemController.updateButton`, `isButtonDisabled`, `rebuildDeviceItems` and `menuItem(for:)`; `AppDelegate.rememberInputName` and `switchDefaultDevice`. The nested ternaries in `MenuMuteRow.draw` became an `if` chain. No behavior change; checklist items 5 to 10, 14 to 17 and 22 cover the UI on hardware. Reason: `Docs/CODE_REVIEW.md` §3.
+- stored property initializers keep an unqualified `#selector` (`StatusItemController.accessItem`, `muteItem`) and `VolumeSlider.Cell` names its own type for `dynamicColor`, each with a comment, because `self` and `Self` are not available there.
+- version bump: 1.2.12 to 1.2.13 (PATCH - style refactoring)
+
 ### 2026-10-22 (v1.2.12, review 3.4: DialDevice to the Swift skill)
 
 - `DialDevice` rewritten to the swift-coding-conventions skill; the report handling after parsing moved into `handle(_:)` so no guard follows a statement. The IOKit session, callback and `nonisolated(unsafe)` hand-over code is unchanged apart from the style rules. `DialEvent` and `DialConnection` have no code to change. Reason: `Docs/CODE_REVIEW.md` §3; checklist items 1 to 4 and 11 to 13 cover it on hardware.

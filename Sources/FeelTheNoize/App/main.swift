@@ -10,7 +10,7 @@ let appDelegate = AppDelegate()
 // host through the XCTest harness, which sets this variable; should an Xcode release stop doing so, the first symptom
 // is a test run that seizes the Dial (Docs/DESIGN.md §11.1).
 let isTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-if !isTestHost {
+if isTestHost == false {
     NSApplication.shared.delegate = appDelegate
 }
 NSApplication.shared.run()

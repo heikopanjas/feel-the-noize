@@ -27,12 +27,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.settings = settings
         self.audio = audio
         self.dial = dial
-        controller = DialController(audio: audio, haptics: dial, settings: { settings.controlSettings })
-        keepAwake = DialKeepAwake { dial.sendKeepAlive() }
+        self.controller = DialController(audio: audio, haptics: dial, settings: { settings.controlSettings })
+        self.keepAwake = DialKeepAwake { dial.sendKeepAlive() }
         super.init()
     }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func applicationDidFinishLaunching(_ notification: Notification) -> Void {
         let statusItem = StatusItemController()
         statusItem.onToggleMute = { [weak self] in
             self?.toggleMuteFromMenu()
@@ -54,9 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         self.statusItem = statusItem
 
-        audio.preferences = settings
-        applyIconStyle()
-        settings.onChange = { [weak self] in
+        self.audio.preferences = self.settings
+        self.applyIconStyle()
+        self.settings.onChange = { [weak self] in
             self?.applyIconStyle()
             self?.applyDialConfiguration()
             self?.applyKeepAwake()
@@ -66,19 +66,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.refreshStatusItem()
         }
         // Stored before start(), so the first match already gets the user's configuration.
-        applyDialConfiguration()
-        applyKeepAwake()
-        applyKeptInput()
+        self.applyDialConfiguration()
+        self.applyKeepAwake()
+        self.applyKeptInput()
 
-        dial.onEvent = { [weak self] event in
+        self.dial.onEvent = { [weak self] event in
             Log.control.debug("Dial event: \(String(describing: event), privacy: .public)")
             self?.controller.handle(event)
         }
         // The seized Dial bypasses the HID event system, so its use is declared to macOS like mouse input.
-        dial.onActivity = { [weak self] in
+        self.dial.onActivity = { [weak self] in
             self?.userActivity.declare()
         }
-        dial.onConnectionChange = { [weak self] connection in
+        self.dial.onConnectionChange = { [weak self] connection in
             Log.control.info("Dial \(String(describing: connection), privacy: .public)")
             if connection != .connected {
                 self?.controller.reset()
@@ -88,140 +88,171 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.confirmConnection(connection)
             self?.refreshStatusItem()
         }
-        dial.onAccessDenied = { [weak self] in
+        self.dial.onAccessDenied = { [weak self] in
             self?.isAccessDenied = true
             self?.statusItem?.setAccessDenied(true)
         }
 
-        audio.onChange = { [weak self] state in
+        self.audio.onChange = { [weak self] state in
             Log.audio.info("Audio state: \(String(describing: state), privacy: .public)")
-            if let state {
+            if let state = state {
                 // Remembered here too, so the Devices tab lists outputs seen while it was closed.
                 self?.settings.rememberDevices([state.deviceUID: state.deviceName])
             }
             self?.refreshStatusItem()
         }
-        controller.onAdjusted = { [weak self] state in
-            guard let self, settings.showOverlay else { return }
-            overlay.show(state)
+        self.controller.onAdjusted = { [weak self] state in
+            guard let self = self else {
+                return
+            }
+            guard self.settings.showOverlay == true else {
+                return
+            }
+            self.overlay.show(state)
         }
 
-        audio.start()
-        dial.start()
-        isReadyClickSkipped = dial.isPresent
-        keepAwake.start()
-        refreshStatusItem()
+        self.audio.start()
+        self.dial.start()
+        self.isReadyClickSkipped = self.dial.isPresent
+        self.keepAwake.start()
+        self.refreshStatusItem()
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
-        keepAwake.stop()
-        dial.stop()
-        audio.stop()
+    func applicationWillTerminate(_ notification: Notification) -> Void {
+        self.keepAwake.stop()
+        self.dial.stop()
+        self.audio.stop()
     }
 
     /// Retries a Dial held by another process, and opening the Dial after the user may have granted Input Monitoring
     /// (Docs/DESIGN.md §9.2).
-    func applicationDidBecomeActive(_ notification: Notification) {
-        dial.retryIfInUseElsewhere()
-        guard isAccessDenied else { return }
-        isAccessDenied = false
-        statusItem?.setAccessDenied(false)
-        dial.stop()
-        dial.start()
+    func applicationDidBecomeActive(_ notification: Notification) -> Void {
+        self.dial.retryIfInUseElsewhere()
+        if self.isAccessDenied == false {
+            return
+        }
+        self.isAccessDenied = false
+        self.statusItem?.setAccessDenied(false)
+        self.dial.stop()
+        self.dial.start()
     }
 
     // MARK: - Wiring
 
-    private func refreshStatusItem() {
-        let isOutputEnabled = audio.state.map { settings.isDeviceEnabled($0.deviceUID) } ?? true
-        statusItem?.update(audio: audio.state, dial: dial.connection, isOutputEnabled: isOutputEnabled)
+    private func refreshStatusItem() -> Void {
+        let isOutputEnabled = self.audio.state.map { self.settings.isDeviceEnabled($0.deviceUID) } ?? true
+        self.statusItem?.update(audio: self.audio.state, dial: self.dial.connection, isOutputEnabled: isOutputEnabled)
     }
 
     /// Menu changes go straight to the audio device: no haptics and no overlay, which belong to the Dial.
-    private func toggleMuteFromMenu() {
-        guard let state = audio.state else { return }
-        audio.setMuted(!state.isMuted)
+    private func toggleMuteFromMenu() -> Void {
+        guard let state = self.audio.state else {
+            return
+        }
+        self.audio.setMuted(state.isMuted == false)
     }
 
     /// Moving the slider unmutes, as in the system Sound menu. No haptics and no overlay, as for the menu's Mute.
-    private func setVolumeFromMenu(_ volume: Float32) {
-        guard let state = audio.state, state.canSetVolume else { return }
-        if state.isMuted {
-            audio.setMuted(false)
+    private func setVolumeFromMenu(_ volume: Float32) -> Void {
+        guard let state = self.audio.state else {
+            return
         }
-        audio.setVolume(volume)
+        guard state.canSetVolume == true else {
+            return
+        }
+        if state.isMuted == true {
+            self.audio.setMuted(false)
+        }
+        self.audio.setVolume(volume)
     }
 
     /// While a device is kept, the menu choice becomes the new kept device (Docs/DESIGN.md §7.13). The keep moves before the
     /// switch, so the keeper does not revert it.
-    private func selectInputFromMenu(_ uid: String) {
-        if settings.keptInputDeviceUID != nil {
-            if let deviceID = try? CoreAudioProperty.readDevice(uid: uid),
-                let name = try? CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID)
-            {
-                settings.rememberInputDevices([uid: name])
-            }
-            settings.keptInputDeviceUID = uid
+    private func selectInputFromMenu(_ uid: String) -> Void {
+        if self.settings.keptInputDeviceUID != nil {
+            self.rememberInputName(uid: uid)
+            self.settings.keptInputDeviceUID = uid
         }
-        selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeInput)
+        self.selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeInput)
+    }
+
+    /// So the Devices tab can name the kept device while it is disconnected.
+    private func rememberInputName(uid: String) -> Void {
+        guard let deviceID = try? CoreAudioProperty.readDevice(uid: uid) else {
+            return
+        }
+        guard let name = try? CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID) else {
+            return
+        }
+        self.settings.rememberInputDevices([uid: name])
     }
 
     /// `AudioOutput` and the open menu follow the new default through their own listeners (Docs/DESIGN.md §7.11).
-    private func selectDefaultDevice(_ uid: String, scope: AudioObjectPropertyScope) {
+    private func selectDefaultDevice(_ uid: String, scope: AudioObjectPropertyScope) -> Void {
         let direction = scope == kAudioDevicePropertyScopeInput ? "input" : "output"
         do {
-            guard let deviceID = try CoreAudioProperty.readDevice(uid: uid) else {
-                Log.audio.error("Cannot select \(uid, privacy: .public) as default \(direction, privacy: .public): not connected")
-                return
-            }
-            try CoreAudioProperty.writeDefaultDevice(deviceID, scope: scope)
-            Log.audio.info("Selected \(uid, privacy: .public) as default \(direction, privacy: .public)")
+            try self.switchDefaultDevice(to: uid, scope: scope, direction: direction)
         }
         catch {
             Log.audio.error("\(error, privacy: .public)")
         }
     }
 
+    private func switchDefaultDevice(to uid: String, scope: AudioObjectPropertyScope, direction: String) throws -> Void {
+        guard let deviceID = try CoreAudioProperty.readDevice(uid: uid) else {
+            Log.audio.error("Cannot select \(uid, privacy: .public) as default \(direction, privacy: .public): not connected")
+            return
+        }
+        try CoreAudioProperty.writeDefaultDevice(deviceID, scope: scope)
+        Log.audio.info("Selected \(uid, privacy: .public) as default \(direction, privacy: .public)")
+    }
+
     /// The turn that wakes the Dial is lost while macOS reconnects, so a click tells the user when the Dial is ready. An
     /// app cannot wake a sleeping Dial (Docs/DESIGN.md §2.1), so after a launch the user's touch is the wake-up as well.
     /// A Dial already awake at launch gets no click but an immediate keep-alive, since its idle time is unknown (§7.14).
-    private func confirmConnection(_ connection: DialConnection) {
-        guard connection == .connected else { return }
-        if isReadyClickSkipped {
-            keepAwake.sendNow()
+    private func confirmConnection(_ connection: DialConnection) -> Void {
+        guard connection == .connected else {
+            return
+        }
+        if self.isReadyClickSkipped == true {
+            self.keepAwake.sendNow()
         }
         else {
-            dial.playHaptic(.click)
+            self.dial.playHaptic(.click)
         }
-        isReadyClickSkipped = false
+        self.isReadyClickSkipped = false
     }
 
-    private func applyIconStyle() {
-        statusItem?.iconStyle = settings.iconStyle
-        overlay.iconStyle = settings.iconStyle
+    private func applyIconStyle() -> Void {
+        self.statusItem?.iconStyle = self.settings.iconStyle
+        self.overlay.iconStyle = self.settings.iconStyle
     }
 
-    private func applyDialConfiguration() {
-        let detents = settings.detentsPerRevolution
-        let haptics = settings.hapticDetents
-        guard detents != appliedDetents || haptics != appliedHaptics else { return }
-        appliedDetents = detents
-        appliedHaptics = haptics
-        dial.configure(detentsPerRevolution: detents, hapticsEnabled: haptics)
+    private func applyDialConfiguration() -> Void {
+        let detents = self.settings.detentsPerRevolution
+        let haptics = self.settings.hapticDetents
+        if detents == self.appliedDetents {
+            if haptics == self.appliedHaptics {
+                return
+            }
+        }
+        self.appliedDetents = detents
+        self.appliedHaptics = haptics
+        self.dial.configure(detentsPerRevolution: detents, hapticsEnabled: haptics)
     }
 
-    private func applyKeepAwake() {
-        keepAwake.isEnabled = settings.keepDialAwake
+    private func applyKeepAwake() -> Void {
+        self.keepAwake.isEnabled = self.settings.keepDialAwake
     }
 
-    private func applyKeptInput() {
-        inputKeeper.keptUID = settings.keptInputDeviceUID
-        statusItem?.keptInputUID = settings.keptInputDeviceUID
+    private func applyKeptInput() -> Void {
+        self.inputKeeper.keptUID = self.settings.keptInputDeviceUID
+        self.statusItem?.keptInputUID = self.settings.keptInputDeviceUID
     }
 
-    private func showSettings() {
-        let window = settingsWindow ?? SettingsWindowController(settings: settings)
-        settingsWindow = window
+    private func showSettings() -> Void {
+        let window = self.settingsWindow ?? SettingsWindowController(settings: self.settings)
+        self.settingsWindow = window
         window.show()
     }
 }

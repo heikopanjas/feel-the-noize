@@ -20,30 +20,30 @@ final class GeneralSettingsViewController: NSViewController {
     init(settings: Settings) {
         self.settings = settings
         super.init(nibName: nil, bundle: nil)
-        title = "General"
+        self.title = "General"
     }
 
     required init?(coder: NSCoder) {
-        nil
+        return nil
     }
 
-    override func loadView() {
-        configureControls()
+    override func loadView() -> Void {
+        self.configureControls()
 
-        let approvalStack = NSStackView(views: [approvalLabel, approvalButton])
+        let approvalStack = NSStackView(views: [self.approvalLabel, self.approvalButton])
         approvalStack.orientation = .vertical
         approvalStack.alignment = .leading
         approvalStack.spacing = 6
 
         let grid = NSGridView(views: [
-            [Self.label("Detents per turn:"), detentsPopUp],
-            [Self.label("Volume step:"), stepPopUp],
-            [Self.label("Icon style:"), iconStylePopUp],
-            [NSGridCell.emptyContentView, reverseCheckbox],
-            [NSGridCell.emptyContentView, hapticsCheckbox],
-            [NSGridCell.emptyContentView, keepAwakeCheckbox],
-            [NSGridCell.emptyContentView, overlayCheckbox],
-            [NSGridCell.emptyContentView, loginCheckbox],
+            [Self.label("Detents per turn:"), self.detentsPopUp],
+            [Self.label("Volume step:"), self.stepPopUp],
+            [Self.label("Icon style:"), self.iconStylePopUp],
+            [NSGridCell.emptyContentView, self.reverseCheckbox],
+            [NSGridCell.emptyContentView, self.hapticsCheckbox],
+            [NSGridCell.emptyContentView, self.keepAwakeCheckbox],
+            [NSGridCell.emptyContentView, self.overlayCheckbox],
+            [NSGridCell.emptyContentView, self.loginCheckbox],
             [NSGridCell.emptyContentView, approvalStack]
         ])
         grid.column(at: 0).xPlacement = .trailing
@@ -51,7 +51,7 @@ final class GeneralSettingsViewController: NSViewController {
         grid.rowSpacing = 8
         grid.columnSpacing = 8
         grid.row(at: 3).topPadding = 8
-        approvalRow = grid.row(at: 8)
+        self.approvalRow = grid.row(at: 8)
 
         let container = NSView()
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -62,107 +62,108 @@ final class GeneralSettingsViewController: NSViewController {
             grid.topAnchor.constraint(equalTo: container.topAnchor, constant: Self.margin),
             grid.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.margin)
         ])
-        view = container
+        self.view = container
     }
 
     /// Launch at login can change in System Settings, so the controls are re-read every time the window appears.
-    override func viewWillAppear() {
+    override func viewWillAppear() -> Void {
         super.viewWillAppear()
-        refresh()
+        self.refresh()
     }
 
     // MARK: - Controls
 
-    private func configureControls() {
+    private func configureControls() -> Void {
         for detents in Settings.detentChoices {
-            detentsPopUp.addItem(withTitle: "\(detents)")
-            detentsPopUp.lastItem?.tag = detents
+            self.detentsPopUp.addItem(withTitle: "\(detents)")
+            self.detentsPopUp.lastItem?.tag = detents
         }
         for (index, style) in KnobIcon.Style.allCases.enumerated() {
-            iconStylePopUp.addItem(withTitle: style.title)
-            iconStylePopUp.lastItem?.tag = index
-            iconStylePopUp.lastItem?.image = KnobIcon.image(style: style, level: 0.6, isMuted: false, size: 16, accessibilityDescription: nil)
+            self.iconStylePopUp.addItem(withTitle: style.title)
+            self.iconStylePopUp.lastItem?.tag = index
+            self.iconStylePopUp.lastItem?.image = KnobIcon.image(style: style, level: 0.6, isMuted: false, size: 16, accessibilityDescription: nil)
         }
         for percent in Settings.stepPercentChoices {
-            stepPopUp.addItem(withTitle: "\(percent) %")
-            stepPopUp.lastItem?.tag = percent
+            self.stepPopUp.addItem(withTitle: "\(percent) %")
+            self.stepPopUp.lastItem?.tag = percent
         }
 
         let actions: [(NSControl, Selector)] = [
-            (detentsPopUp, #selector(detentsChanged(_:))), (stepPopUp, #selector(stepChanged(_:))),
-            (iconStylePopUp, #selector(iconStyleChanged(_:))),
-            (reverseCheckbox, #selector(reverseChanged(_:))), (hapticsCheckbox, #selector(hapticsChanged(_:))),
-            (keepAwakeCheckbox, #selector(keepAwakeChanged(_:))),
-            (overlayCheckbox, #selector(overlayChanged(_:))), (loginCheckbox, #selector(loginChanged(_:))),
-            (approvalButton, #selector(openLoginItems(_:)))
+            (self.detentsPopUp, #selector(self.detentsChanged(_:))), (self.stepPopUp, #selector(self.stepChanged(_:))),
+            (self.iconStylePopUp, #selector(self.iconStyleChanged(_:))),
+            (self.reverseCheckbox, #selector(self.reverseChanged(_:))), (self.hapticsCheckbox, #selector(self.hapticsChanged(_:))),
+            (self.keepAwakeCheckbox, #selector(self.keepAwakeChanged(_:))),
+            (self.overlayCheckbox, #selector(self.overlayChanged(_:))), (self.loginCheckbox, #selector(self.loginChanged(_:))),
+            (self.approvalButton, #selector(self.openLoginItems(_:)))
         ]
         for (control, action) in actions {
             control.target = self
             control.action = action
         }
 
-        approvalLabel.textColor = .secondaryLabelColor
-        approvalLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        approvalButton.controlSize = .small
+        self.approvalLabel.textColor = .secondaryLabelColor
+        self.approvalLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        self.approvalButton.controlSize = .small
     }
 
-    private func refresh() {
-        detentsPopUp.selectItem(withTag: settings.detentsPerRevolution)
-        stepPopUp.selectItem(withTag: settings.volumeStepPercent)
-        iconStylePopUp.selectItem(withTag: KnobIcon.Style.allCases.firstIndex(of: settings.iconStyle) ?? 0)
-        reverseCheckbox.state = settings.reverseDirection ? .on : .off
-        hapticsCheckbox.state = settings.hapticDetents ? .on : .off
-        keepAwakeCheckbox.state = settings.keepDialAwake ? .on : .off
-        overlayCheckbox.state = settings.showOverlay ? .on : .off
-        loginCheckbox.state = LoginItem.isEnabled ? .on : .off
-        approvalRow?.isHidden = LoginItem.status != .requiresApproval
+    private func refresh() -> Void {
+        self.detentsPopUp.selectItem(withTag: self.settings.detentsPerRevolution)
+        self.stepPopUp.selectItem(withTag: self.settings.volumeStepPercent)
+        self.iconStylePopUp.selectItem(withTag: KnobIcon.Style.allCases.firstIndex(of: self.settings.iconStyle) ?? 0)
+        self.reverseCheckbox.state = self.settings.reverseDirection == true ? .on : .off
+        self.hapticsCheckbox.state = self.settings.hapticDetents == true ? .on : .off
+        self.keepAwakeCheckbox.state = self.settings.keepDialAwake == true ? .on : .off
+        self.overlayCheckbox.state = self.settings.showOverlay == true ? .on : .off
+        self.loginCheckbox.state = LoginItem.isEnabled == true ? .on : .off
+        self.approvalRow?.isHidden = LoginItem.status != .requiresApproval
         // The tab view sizes the window from this; without it the grid is stretched to a default size.
-        view.layoutSubtreeIfNeeded()
-        preferredContentSize = view.fittingSize
+        self.view.layoutSubtreeIfNeeded()
+        self.preferredContentSize = self.view.fittingSize
     }
 
     private static func label(_ text: String) -> NSTextField {
-        NSTextField(labelWithString: text)
+        return NSTextField(labelWithString: text)
     }
 
     // MARK: - Actions
 
-    @objc private func detentsChanged(_ sender: NSPopUpButton) {
-        settings.detentsPerRevolution = sender.selectedTag()
+    @objc private func detentsChanged(_ sender: NSPopUpButton) -> Void {
+        self.settings.detentsPerRevolution = sender.selectedTag()
     }
 
-    @objc private func iconStyleChanged(_ sender: NSPopUpButton) {
+    @objc private func iconStyleChanged(_ sender: NSPopUpButton) -> Void {
         let styles = KnobIcon.Style.allCases
-        guard styles.indices.contains(sender.selectedTag()) else { return }
-        settings.iconStyle = styles[sender.selectedTag()]
+        if styles.indices.contains(sender.selectedTag()) == true {
+            self.settings.iconStyle = styles[sender.selectedTag()]
+        }
     }
 
-    @objc private func stepChanged(_ sender: NSPopUpButton) {
-        settings.volumeStepPercent = sender.selectedTag()
+    @objc private func stepChanged(_ sender: NSPopUpButton) -> Void {
+        self.settings.volumeStepPercent = sender.selectedTag()
     }
 
-    @objc private func reverseChanged(_ sender: NSButton) {
-        settings.reverseDirection = sender.state == .on
+    @objc private func reverseChanged(_ sender: NSButton) -> Void {
+        self.settings.reverseDirection = sender.state == .on
     }
 
-    @objc private func hapticsChanged(_ sender: NSButton) {
-        settings.hapticDetents = sender.state == .on
+    @objc private func hapticsChanged(_ sender: NSButton) -> Void {
+        self.settings.hapticDetents = sender.state == .on
     }
 
-    @objc private func keepAwakeChanged(_ sender: NSButton) {
-        settings.keepDialAwake = sender.state == .on
+    @objc private func keepAwakeChanged(_ sender: NSButton) -> Void {
+        self.settings.keepDialAwake = sender.state == .on
     }
 
-    @objc private func overlayChanged(_ sender: NSButton) {
-        settings.showOverlay = sender.state == .on
+    @objc private func overlayChanged(_ sender: NSButton) -> Void {
+        self.settings.showOverlay = sender.state == .on
     }
 
-    @objc private func loginChanged(_ sender: NSButton) {
+    @objc private func loginChanged(_ sender: NSButton) -> Void {
         LoginItem.setEnabled(sender.state == .on)
-        refresh()
+        self.refresh()
     }
 
-    @objc private func openLoginItems(_ sender: NSButton) {
+    @objc private func openLoginItems(_ sender: NSButton) -> Void {
         LoginItem.openSystemSettings()
     }
 }

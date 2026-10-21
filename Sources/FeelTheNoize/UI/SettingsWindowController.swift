@@ -7,10 +7,11 @@ final class SettingsWindowController: NSWindowController {
     init(settings: Settings) {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
-        for (viewController, symbol) in [
-            (GeneralSettingsViewController(settings: settings) as NSViewController, "gearshape"),
+        let viewControllers: [(NSViewController, String)] = [
+            (GeneralSettingsViewController(settings: settings), "gearshape"),
             (DeviceSettingsViewController(settings: settings), "hifispeaker.2")
-        ] {
+        ]
+        for (viewController, symbol) in viewControllers {
             let item = NSTabViewItem(viewController: viewController)
             item.label = viewController.title ?? ""
             item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
@@ -26,17 +27,17 @@ final class SettingsWindowController: NSWindowController {
     }
 
     required init?(coder: NSCoder) {
-        nil
+        return nil
     }
 
-    func show() {
-        if !hasBeenShown {
-            window?.center()
-            hasBeenShown = true
+    func show() -> Void {
+        if self.hasBeenShown == false {
+            self.window?.center()
+            self.hasBeenShown = true
         }
         // The app is an LSUIElement agent, so it has to activate itself for the window to come to the front.
         NSApp.activate()
-        showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
+        self.showWindow(nil)
+        self.window?.makeKeyAndOrderFront(nil)
     }
 }
