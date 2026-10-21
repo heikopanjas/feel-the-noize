@@ -10,7 +10,7 @@ SCHEME=FeelTheNoize
 APP_NAME="Feel the Noize"
 APP_DEBUG=".build/Products/Debug/$APP_NAME.app"
 APP_RELEASE=".build/Products/Release/$APP_NAME.app"
-DIST=build/dist
+DIST=.build/dist
 VERSION=$(awk -F'"' '/MARKETING_VERSION/ { print $2 }' project.yml)
 ZIP="$DIST/FeelTheNoize-$VERSION.zip"
 
@@ -35,7 +35,7 @@ Usage: ./build.sh [command ...]
   icon       re-render the app icon
   release    test, then Developer ID signed build zipped to $ZIP
   notarize   submit $ZIP, staple, Gatekeeper check, re-zip
-  clean      remove build and .build
+  clean      remove .build
 
 Environment overrides: TEAM_ID, DEVELOPER_ID, NOTARY_PROFILE.
 EOF
@@ -127,7 +127,7 @@ cmd_notarize() {
 }
 
 cmd_clean() {
-    rm -rf build .build
+    rm -rf .build
 }
 
 if [ $# -eq 0 ]; then

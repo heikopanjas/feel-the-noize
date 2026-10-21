@@ -92,7 +92,7 @@ Or run `xcodegen generate` and open the generated `FeelTheNoize.xcodeproj` in Xc
 xcrun notarytool store-credentials developer-id-notary \
   --key AuthKey_<key-id>.p8 --key-id <key-id> --issuer <issuer-uuid>
 
-./build.sh release    # test, Developer ID sign, verify, zip to build/dist
+./build.sh release    # test, Developer ID sign, verify, zip to .build/dist
 ./build.sh notarize   # submit, staple, Gatekeeper check, re-zip
 ```
 

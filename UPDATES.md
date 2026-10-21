@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, single build folder)
+
+- Release zips moved from `build/dist` to `.build/dist`, so `.build` is the only build folder; `./build.sh clean` removes only `.build`, the `build/` entry left `.gitignore`, and README and DESIGN.md §9.1 name the new path. The existing zips were moved over. Reason: requested by the developer; `build/` held nothing but the zips.
+- Products and intermediates land in `.build/Products` and `.build/Intermediates` because of the developer's global Xcode build location setting (custom, relative to the workspace), not because of `project.yml` or `build.sh`. On a Mac without that setting they go to DerivedData and the app paths in `build.sh` do not match.
+
 ### 2026-10-22 (v1.2.0, capitalized docs and scripts folders)
 
 - `docs` renamed to `Docs` and `scripts` to `Scripts`, requested by the developer. References in build.sh, README, AGENTS.md, DESIGN.md, the icon script and the source comments now use the new names; older log entries keep the old paths, since the log is append-only.

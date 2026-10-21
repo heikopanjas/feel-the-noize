@@ -8,7 +8,6 @@
 # Xcode
 xcuserdata/
 DerivedData/
-build/
 *.hmap
 *.dSYM
 *.dSYM.zip
