@@ -1,6 +1,6 @@
 import CoreAudio
 
-/// An output device as listed in the Devices settings tab (docs/DESIGN.md §7.6).
+/// An audio device as listed in the Devices settings tab and the status menu (docs/DESIGN.md §7.6, §7.11).
 struct AudioDeviceInfo: Equatable {
     enum Transport: Equatable {
         case builtIn
@@ -48,6 +48,9 @@ struct AudioDeviceInfo: Equatable {
     let uid: String
     let name: String
     let transport: Transport
+    let hasOutput: Bool
+    let hasInput: Bool
+    /// Volume and mute describe the output; they are false for an input-only device.
     let canSetVolume: Bool
     let hasHardwareMute: Bool
 

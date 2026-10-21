@@ -216,7 +216,7 @@ final class AudioOutput: AudioControlling {
     private func defaultDeviceChanged() {
         let deviceID: AudioObjectID?
         do {
-            deviceID = try CoreAudioProperty.readDefaultOutputDevice()
+            deviceID = try CoreAudioProperty.readDefaultDevice(scope: kAudioDevicePropertyScopeOutput)
         }
         catch {
             Log.audio.error("\(error, privacy: .public)")

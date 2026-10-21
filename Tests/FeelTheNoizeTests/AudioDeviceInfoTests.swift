@@ -29,7 +29,9 @@ struct AudioDeviceInfoTests {
         "Controllable with volume or mute",
         arguments: [(true, true, true), (true, false, true), (false, true, true), (false, false, false)])
     func controllable(canSetVolume: Bool, hasHardwareMute: Bool, expected: Bool) {
-        let device = AudioDeviceInfo(uid: "x", name: "X", transport: .usb, canSetVolume: canSetVolume, hasHardwareMute: hasHardwareMute)
+        let device = AudioDeviceInfo(
+            uid: "x", name: "X", transport: .usb, hasOutput: true, hasInput: false, canSetVolume: canSetVolume,
+            hasHardwareMute: hasHardwareMute)
         #expect(device.isControllable == expected)
     }
 }

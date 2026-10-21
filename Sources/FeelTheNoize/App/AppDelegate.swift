@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 
 /// Owns all long-lived objects, wires their callbacks, starts and stops them (docs/DESIGN.md §6).
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -41,6 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem.onMenuWillOpen = { [weak self] in
             self?.dial.retryIfInUseElsewhere()
+        }
+        statusItem.onSelectOutput = { [weak self] uid in
+            self?.selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeOutput)
+        }
+        statusItem.onSelectInput = { [weak self] uid in
+            self?.selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeInput)
         }
         self.statusItem = statusItem
 
@@ -138,6 +145,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func toggleMuteFromMenu() {
         guard let state = audio.state else { return }
         audio.setMuted(!state.isMuted)
+    }
+
+    /// `AudioOutput` and the open menu follow the new default through their own listeners (docs/DESIGN.md §7.11).
+    private func selectDefaultDevice(_ uid: String, scope: AudioObjectPropertyScope) {
+        let direction = scope == kAudioDevicePropertyScopeInput ? "input" : "output"
+        do {
+            guard let deviceID = try CoreAudioProperty.readDevice(uid: uid) else {
+                Log.audio.error("Cannot select \(uid, privacy: .public) as default \(direction, privacy: .public): not connected")
+                return
+            }
+            try CoreAudioProperty.writeDefaultDevice(deviceID, scope: scope)
+            Log.audio.info("Selected \(uid, privacy: .public) as default \(direction, privacy: .public)")
+        }
+        catch {
+            Log.audio.error("\(error, privacy: .public)")
+        }
     }
 
     /// The turn that wakes the Dial is lost while macOS reconnects, so a click tells the user when the Dial is ready. An

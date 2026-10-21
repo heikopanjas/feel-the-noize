@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-10-20
+**Last updated:** 2026-10-21
 
 ## Mission Statement
 
@@ -172,3 +172,10 @@ Semantic versioning via `MARKETING_VERSION` in `project.yml`; bump `CURRENT_PROJ
 - Notarization uses the keychain profile `developer-id-notary`, which holds an App Store Connect API key and is shared by all Developer ID apps of the team, instead of the per-app `feelthenoize-notary`. Reason: stored by the developer; a profile is not tied to an app, so one key covers every project.
 - `./build.sh notarize` staples a copy unpacked from the submitted zip instead of the app in `.build/Products/Release`, then validates and re-zips it, and fails early when the zip is missing. Reason: requested by the developer after the first notarization was accepted but stapling failed, because the release app had been moved to /Applications.
 - Renamed app verified on hardware by the developer: Feel the Noize 1.2.0 build 3 from /Applications works with the Dial under the new bundle ID, with permissions granted again.
+
+### 2026-10-21
+
+- Checklist items 1 to 12 confirmed by the developer on the renamed 1.2.0 build 3 installed in /Applications.
+- M6 built: `CoreAudioProperty` reads and writes the default device per scope (`readDefaultDevice(scope:)` replaces `readDefaultOutputDevice()`), looks up a device by UID and checks streams per scope; `AudioDeviceInfo` gains `hasOutput` and `hasInput`; `AudioDeviceList` lists inputs and publishes `defaultOutputUID` and `defaultInputUID`; the Devices tab filters to outputs. `StatusItemController` owns its own device list while the menu is open and shows the Input line and the Output and Input sections; `AppDelegate.selectDefaultDevice(_:scope:)` switches. Reason: FR-19 and FR-20 as designed in DESIGN.md §7.11.
+- A menu section without devices is left out, and the separator before the sections is hidden while there are none. Reason: an empty header or a doubled separator carries no information; not covered by the original design.
+- M6 switching verified by the developer on hardware: outputs and inputs switch from the menu. Still open in items 14 and 15: AirPods appearing while the menu is open, alert sounds following the output, and the Input line following a change in System Settings.

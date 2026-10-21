@@ -2,7 +2,8 @@ import AppKit
 
 /// Menu bar icon and menu (docs/DESIGN.md §5.2, §5.3, §7.5).
 ///
-/// `update(audio:dial:isOutputEnabled:)` changes the icon and every menu line, so an open menu follows the Dial.
+/// `update(audio:dial:isOutputEnabled:)` changes the icon and every menu line, so an open menu follows the Dial. The device
+/// sections and the Input line come from a device list that runs only while the menu is open (§7.11).
 final class StatusItemController: NSObject, NSMenuDelegate {
     private static let inputMonitoringSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 
@@ -10,6 +11,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     var onOpenSettings: (() -> Void)?
     /// Lets the owner retry a Dial held by another process while the user looks at the menu.
     var onMenuWillOpen: (() -> Void)?
+    /// Called with the UID of the device the user picked in the menu.
+    var onSelectOutput: ((String) -> Void)?
+    var onSelectInput: ((String) -> Void)?
     var iconStyle = KnobIcon.Style.arc {
         didSet { update(audio: audio, dial: dial, isOutputEnabled: isOutputEnabled) }
     }
@@ -18,8 +22,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let dialItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let accessItem = NSMenuItem(title: "Allow Input Monitoring…", action: #selector(openInputMonitoringSettings(_:)), keyEquivalent: "")
     private let outputItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let inputItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let volumeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let muteItem = NSMenuItem(title: "Mute", action: #selector(toggleMute(_:)), keyEquivalent: "")
+    /// The device sections are inserted right after this separator.
+    private let deviceSeparator = NSMenuItem.separator()
+    private let deviceList = AudioDeviceList()
+    private var deviceItems: [NSMenuItem] = []
     private var audio: AudioState?
     private var dial = DialConnection.notConnected
     private var isOutputEnabled = true
@@ -30,10 +39,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
         .foregroundColor: NSColor.secondaryLabelColor
     ]
+    /// Device items are commands in the regular menu font; the default device of a section is bold.
+    private static let deviceAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.menuFont(ofSize: 0)]
+    private static let defaultDeviceAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.boldSystemFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize)
+    ]
 
     override init() {
         super.init()
         buildMenu()
+        deviceList.onChange = { [weak self] in
+            self?.deviceListChanged()
+        }
         update(audio: nil, dial: .notConnected, isOutputEnabled: true)
     }
 
@@ -79,9 +96,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
 
-        for infoItem in [dialItem, outputItem, volumeItem] {
+        for infoItem in [dialItem, outputItem, inputItem, volumeItem] {
             infoItem.isEnabled = false
         }
+        Self.setInfoTitle(inputItem, Self.inputTitle(nil))
         accessItem.target = self
         accessItem.isHidden = true
         muteItem.target = self
@@ -93,7 +111,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let quitItem = NSMenuItem(title: "Quit Feel the Noize", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for item in [
-            dialItem, accessItem, outputItem, volumeItem, .separator(), muteItem, .separator(), settingsItem, aboutItem, .separator(), quitItem
+            dialItem, accessItem, outputItem, inputItem, volumeItem, deviceSeparator, .separator(), muteItem, .separator(), settingsItem,
+            aboutItem, .separator(), quitItem
         ] {
             menu.addItem(item)
         }
@@ -101,7 +120,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        // Fills the device sections before the menu shows and keeps them current while it is open.
+        deviceList.start()
         onMenuWillOpen?()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        deviceList.stop()
     }
 
     private func updateMenuItems() {
@@ -125,6 +150,54 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         muteItem.isEnabled = audio.map { $0.hasHardwareMute || $0.canSetVolume } ?? false
     }
 
+    // MARK: - Devices
+
+    private func deviceListChanged() {
+        let defaultInput = deviceList.devices.first { $0.hasInput && $0.uid == deviceList.defaultInputUID }
+        Self.setInfoTitle(inputItem, Self.inputTitle(defaultInput?.name))
+
+        guard let menu = statusItem.menu else { return }
+        for item in deviceItems {
+            menu.removeItem(item)
+        }
+        let sections = Self.deviceSections(deviceList.devices)
+        deviceItems =
+            sectionItems("Output", devices: sections.outputs, defaultUID: deviceList.defaultOutputUID, action: #selector(selectOutput(_:)))
+            + sectionItems("Input", devices: sections.inputs, defaultUID: deviceList.defaultInputUID, action: #selector(selectInput(_:)))
+        let start = menu.index(of: deviceSeparator) + 1
+        for (offset, item) in deviceItems.enumerated() {
+            menu.insertItem(item, at: start + offset)
+        }
+        // Without any device the separator would double the one above Mute.
+        deviceSeparator.isHidden = deviceItems.isEmpty
+    }
+
+    /// A section without devices is left out entirely.
+    private func sectionItems(_ title: String, devices: [AudioDeviceInfo], defaultUID: String?, action: Selector) -> [NSMenuItem] {
+        guard !devices.isEmpty else { return [] }
+        let items = devices.map { device in
+            let item = NSMenuItem(title: device.name, action: action, keyEquivalent: "")
+            item.target = self
+            item.representedObject = device.uid
+            let attributes = device.uid == defaultUID ? Self.defaultDeviceAttributes : Self.deviceAttributes
+            item.attributedTitle = NSAttributedString(string: device.name, attributes: attributes)
+            return item
+        }
+        return [.sectionHeader(title: title)] + items
+    }
+
+    /// Both sections are sorted by name like the Devices tab; a device with output and input appears in both.
+    static func deviceSections(_ devices: [AudioDeviceInfo]) -> (outputs: [AudioDeviceInfo], inputs: [AudioDeviceInfo]) {
+        let sorted = devices.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return (sorted.filter(\.hasOutput), sorted.filter(\.hasInput))
+    }
+
+    static func inputTitle(_ deviceName: String?) -> String {
+        "Input: \(deviceName ?? "None")"
+    }
+
+    // MARK: - Titles
+
     static func title(for dial: DialConnection, batteryLevel: Int?) -> String {
         switch (dial, batteryLevel) {
             case (.connected, .some(let level)): "Surface Dial: Connected, battery \(level) %"
@@ -143,6 +216,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func toggleMute(_ sender: NSMenuItem) {
         onToggleMute?()
+    }
+
+    @objc private func selectOutput(_ sender: NSMenuItem) {
+        guard let uid = sender.representedObject as? String else { return }
+        onSelectOutput?(uid)
+    }
+
+    @objc private func selectInput(_ sender: NSMenuItem) {
+        guard let uid = sender.representedObject as? String else { return }
+        onSelectInput?(uid)
     }
 
     @objc private func openSettings(_ sender: NSMenuItem) {

@@ -14,6 +14,10 @@ enum CoreAudioProperty {
         mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain)
 
+    static let defaultInputDeviceAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+
     /// Core Audio derives the virtual main volume from the per-channel controls; it behaves like the system volume slider.
     /// The HAL serves it through the regular AudioObject calls; the AudioHardwareService API is deprecated since macOS 10.11.
     static let virtualMainVolumeAddress = AudioObjectPropertyAddress(
@@ -25,13 +29,43 @@ enum CoreAudioProperty {
 
     // MARK: - Device Properties
 
-    static func readDefaultOutputDevice() throws -> AudioObjectID? {
-        var address = defaultOutputDeviceAddress
+    /// `scope` is `kAudioDevicePropertyScopeOutput` or `kAudioDevicePropertyScopeInput`.
+    static func readDefaultDevice(scope: AudioObjectPropertyScope) throws -> AudioObjectID? {
+        var address = defaultDeviceAddress(scope: scope)
         var deviceID = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         try AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
-            .throwIfError("Reading the default output device")
+            .throwIfError("Reading the default device")
         return deviceID == kAudioObjectUnknown ? nil : deviceID
+    }
+
+    static func writeDefaultDevice(_ deviceID: AudioObjectID, scope: AudioObjectPropertyScope) throws {
+        var address = defaultDeviceAddress(scope: scope)
+        var deviceID = deviceID
+        try AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, UInt32(MemoryLayout<AudioObjectID>.size), &deviceID
+        )
+        .throwIfError("Setting the default device")
+    }
+
+    /// `nil` when no connected device has this UID, for example after it disconnected while the menu was open.
+    static func readDevice(uid: String) throws -> AudioObjectID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyTranslateUIDToDevice, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var uid = uid as CFString
+        var deviceID = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        try AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<CFString>.size), &uid, &size, &deviceID
+        )
+        .throwIfError("Looking up a device by UID")
+        return deviceID == kAudioObjectUnknown ? nil : deviceID
+    }
+
+    /// The default device properties live in the global scope of the system object; the direction picks the selector.
+    private static func defaultDeviceAddress(scope: AudioObjectPropertyScope) -> AudioObjectPropertyAddress {
+        scope == kAudioDevicePropertyScopeInput ? defaultInputDeviceAddress : defaultOutputDeviceAddress
     }
 
     static func readString(_ selector: AudioObjectPropertySelector, of deviceID: AudioObjectID) throws -> String {
@@ -104,10 +138,9 @@ enum CoreAudioProperty {
         return Array(deviceIDs.prefix(Int(size) / MemoryLayout<AudioObjectID>.size))
     }
 
-    /// Input-only devices have no output streams.
-    static func hasOutputStreams(_ deviceID: AudioObjectID) -> Bool {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyStreams, mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+    /// Input-only devices have no output streams, output-only devices no input streams.
+    static func hasStreams(_ deviceID: AudioObjectID, scope: AudioObjectPropertyScope) -> Bool {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams, mScope: scope, mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0
         return AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr && size > 0
     }

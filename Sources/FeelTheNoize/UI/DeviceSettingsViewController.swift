@@ -129,12 +129,13 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     // MARK: - Rows
 
     private func deviceListChanged() {
-        let connected = deviceList.devices
+        // The list also carries inputs for the status menu; this tab is about outputs only.
+        let connected = deviceList.devices.filter(\.hasOutput)
         settings.rememberDevices(Dictionary(connected.map { ($0.uid, $0.name) }, uniquingKeysWith: { first, _ in first }))
 
         let connectedUIDs = Set(connected.map(\.uid))
         let connectedRows = connected.map { device in
-            Row(uid: device.uid, name: device.name, device: device, isDefaultOutput: device.uid == deviceList.defaultDeviceUID)
+            Row(uid: device.uid, name: device.name, device: device, isDefaultOutput: device.uid == deviceList.defaultOutputUID)
         }
         let rememberedRows = settings.knownDevices.filter { !connectedUIDs.contains($0.key) }.map { uid, name in
             Row(uid: uid, name: name, device: nil, isDefaultOutput: false)

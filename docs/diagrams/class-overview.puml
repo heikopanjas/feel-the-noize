@@ -86,7 +86,8 @@ package "Control" {
 package "Audio" {
     class AudioDeviceList {
         + devices : [AudioDeviceInfo]
-        + defaultDeviceUID : String?
+        + defaultOutputUID : String?
+        + defaultInputUID : String?
         + onChange : () -> Void
         + start()
         + stop()
@@ -95,13 +96,17 @@ package "Audio" {
         + uid : String
         + name : String
         + transport : Transport
+        + hasOutput : Bool
+        + hasInput : Bool
         + canSetVolume : Bool
         + hasHardwareMute : Bool
         + isControllable : Bool
     }
     class CoreAudioProperty <<enum>> {
         + {static} readDeviceIDs() : [AudioObjectID]
-        + {static} readDefaultOutputDevice() : AudioObjectID?
+        + {static} readDefaultDevice(scope) : AudioObjectID?
+        + {static} writeDefaultDevice(AudioObjectID, scope)
+        + {static} readDevice(uid : String) : AudioObjectID?
         + {static} readVolume / writeVolume
         + {static} readMute / writeMute
     }
@@ -148,6 +153,8 @@ package "UI" {
         + onToggleMute : () -> Void
         + onOpenSettings : () -> Void
         + onMenuWillOpen : () -> Void
+        + onSelectOutput : (String) -> Void
+        + onSelectInput : (String) -> Void
         + update(audio : AudioState?, dial : DialConnection, isOutputEnabled : Bool)
         + setAccessDenied(isDenied : Bool)
         + setDialBatteryLevel(level : Int?)
@@ -225,6 +232,7 @@ SettingsWindowController *-- DeviceSettingsViewController
 GeneralSettingsViewController ..> Settings : edits
 GeneralSettingsViewController ..> LoginItem : toggles
 DeviceSettingsViewController *-- AudioDeviceList
+StatusItemController *-- AudioDeviceList
 DeviceSettingsViewController ..> Settings : selects devices
 AudioDeviceList ..> AudioDeviceInfo : lists
 AudioOutput ..> CoreAudioProperty : uses
