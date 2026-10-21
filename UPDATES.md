@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.11, review 3.3: audio adapters to the Swift skill)
+
+- `CoreAudioProperty` and `SoftwareVolume` rewritten to the swift-coding-conventions skill (`AudioOutput`, `AudioDeviceList` and `InputDeviceKeeper` were already rewritten in 4.1); the IO block body moved into two `nonisolated static` helpers, `render` and `silence`, with the same per-sample loops, no allocation, no lock and no log. Reason: `Docs/CODE_REVIEW.md` §3; the real-time constraints of DESIGN.md §7.9 are unchanged.
+- `SoftwareVolumePreferences` moved from `AudioOutput.swift` into its own file.
+- version bump: 1.2.10 to 1.2.11 (PATCH - style refactoring)
+
 ### 2026-10-22 (v1.2.10, review 3.2: control and support to the Swift skill)
 
 - `DialController`, `Settings`, `UserActivity`, `DialKeepAwake`, `LoginItem` and `Log` rewritten to the swift-coding-conventions skill as in 3.1; `DialController.rotate` splits into `rotate`, `step` and `apply` so every guard is first in its function. No behavior change; `DialControllerTests`, `SettingsTests`, `UserActivityTests` and `DialKeepAwakeTests` pin them. Reason: `Docs/CODE_REVIEW.md` §3.

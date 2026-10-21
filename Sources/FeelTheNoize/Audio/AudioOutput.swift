@@ -1,12 +1,5 @@
 import CoreAudio
 
-/// Where `AudioOutput` learns whether a device should get software volume and keeps its level; `Settings` conforms.
-protocol SoftwareVolumePreferences: AnyObject {
-    func wantsSoftwareVolume(_ uid: String) -> Bool
-    func softwareVolumeLevel(_ uid: String) -> Float
-    func setSoftwareVolumeLevel(_ uid: String, _ level: Float) -> Void
-}
-
 /// Wraps Core Audio for the current default output device (Docs/DESIGN.md §7.4).
 ///
 /// Listener blocks are registered on the main queue, so all notifications arrive on the main thread. Core Audio, the
