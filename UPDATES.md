@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.16, review 3.8: icon script without force unwraps)
+
+- `Scripts/render-icon.swift` replaces its nine `!` and `try!` with guards that end the script through `fail(_:)`, a message on stderr and exit code 1, so `./build.sh icon` fails loudly instead of crashing; the drawing calls, their order and their values are unchanged, so the rendered PNGs should be byte-identical (to be confirmed with `./build.sh icon` and `git status` on a Mac). Semicolons and multi-variable `let`s are split as the skill asks. Reason: `Docs/CODE_REVIEW.md` §2.7 and milestone 3.8.
+- version bump: 1.2.15 to 1.2.16 (PATCH - build script robustness)
+
 ### 2026-10-22 (v1.2.15, review 3.7: tests to the Swift skill)
 
 - the test target follows the swift-coding-conventions skill as well: `== true` / `== false` in every `#expect`, explicit `self.` and `Self.` in fixtures and fakes, explicit `return` in multi-line closures and helpers, `-> Void` on every test and fixture function, one condition per guard. `AccessoryBatteryTests` gains a clamp case and `KeepChoicesTests` a keep-off case found while rewriting. Reason: `Docs/CODE_REVIEW.md` milestone 3.7.
