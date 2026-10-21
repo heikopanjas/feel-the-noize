@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.7, review 2.4: tests grouped like the sources)
+
+- the test suites moved from one flat folder into `Audio/`, `Control/`, `Dial/`, `Support/` and `UI/` under `Tests/FeelTheNoizeTests`, each next to the production file it covers, with the shared fixtures in `Fixtures/`; `git mv` only, no content change. Reason: decided by the developer (`Docs/CODE_REVIEW.md` Decisions); XcodeGen includes the folders from the source path, so `project.yml` is unchanged.
+- version bump: 1.2.6 to 1.2.7 (PATCH - test layout only)
+
 ### 2026-10-22 (v1.2.6, review 2.1 to 2.3: test hygiene and pure tests)
 
 - every `#expect(!x)` became `#expect(x == false)`, so a failure prints the value; float comparisons go through `expectClose(_:_:tolerance:)` (`Tests/FeelTheNoizeTests/Fixtures/Expectations.swift`), which reports both values at the caller's line. Reason: `Docs/CODE_REVIEW.md` §4.1 and §4.5 (swift-testing-pro: `!` defeats the macro's diagnostics).

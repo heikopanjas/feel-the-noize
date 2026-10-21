@@ -106,7 +106,7 @@ Architecture and behavior changes go into `Docs/DESIGN.md` as well.
 ### Testing
 
 - Unit tests: target `FeelTheNoizeTests` in `Tests/FeelTheNoizeTests`, hosted in the app; the app does not install `AppDelegate` while hosting tests, so a test run never seizes the Dial or touches the audio device
-- Test layout mirrors `Sources/FeelTheNoize`: a suite for `Sources/FeelTheNoize/<Group>/Foo.swift` lives in `Tests/FeelTheNoizeTests/<Group>/FooTests.swift`; shared fakes and fixtures in `Tests/FeelTheNoizeTests/Fixtures/` (the move of the existing flat suites is milestone 2.4 of `Docs/CODE_REVIEW.md`)
+- Test layout mirrors `Sources/FeelTheNoize`: a suite for `Sources/FeelTheNoize/<Group>/Foo.swift` lives in `Tests/FeelTheNoizeTests/<Group>/FooTests.swift`; shared fakes and fixtures in `Tests/FeelTheNoizeTests/Fixtures/`
 - Hardware checks: the manual test checklist in `Docs/DESIGN.md` §11.2
 - Open review findings and the fix plan: `Docs/CODE_REVIEW.md`; its Decisions table settles the questions the plan raised, so execute it without re-asking
 - Testing framework: Swift Testing

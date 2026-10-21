@@ -763,6 +763,8 @@ Target `FeelTheNoizeTests`, added to `project.yml` in milestone M2. The `FeelThe
 
 The tests run hosted in the app. `main.swift` detects the test host through the `XCTestConfigurationFilePath` environment variable and then does not install `AppDelegate`, so a test run neither seizes the Dial nor touches audio. Swift Testing under `xcodebuild test` still launches the host through the XCTest harness, which sets that variable; if an Xcode release stops doing so, the first symptom is a test run that seizes the Dial, and the check needs another signal (for example a launch argument set in the scheme).
 
+The suites mirror the source layout: the tests for `Sources/FeelTheNoize/<Group>/Foo.swift` live in `Tests/FeelTheNoizeTests/<Group>/FooTests.swift`, and fixtures shared by several suites in `Tests/FeelTheNoizeTests/Fixtures/`. XcodeGen picks up the folders from the target's source path.
+
 The test target inherits `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` from the base settings in `project.yml`, so every suite and test runs on the main actor without annotation; that is why fixtures and closures that capture test-local `var`s compile without `@MainActor` or `Sendable` conformances.
 
 | Suite | Covers |
@@ -843,7 +845,10 @@ FeelTheNoize/
 │   │                              BatteryIcon.swift, MenuInfoRow.swift, MenuDeviceRow.swift
 │   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift, UserActivity.swift
 │   └── Resources/                 Assets.xcassets
-└── Tests/FeelTheNoizeTests/      Swift Testing suites (from M2)
+└── Tests/FeelTheNoizeTests/      Swift Testing suites (from M2), grouped like Sources
+    ├── Audio/, Control/, Dial/,   one <Type>Tests.swift per production file
+    │   Support/, UI/
+    └── Fixtures/                  ManualSleeper, Expectations and the fakes shared by the suites
 ```
 
 `HapticWaveform`, `DialInputReport` live in `DialReport.swift`; `AudioControlling` and `HapticFeedback` in `DialController.swift`; `ControlSettings` in `Settings.swift` (alone there in M3; `AppDelegate` passes the §7.7 defaults until the `Settings` store arrives in M4).
