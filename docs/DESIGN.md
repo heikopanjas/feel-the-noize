@@ -96,6 +96,7 @@ Mac Dial's playback mode does volume plus play/pause, but has no mute and goes t
 | FR-19 | Device list and switching done in M6; battery levels planned (M7). The menu lists the connected output and input devices; the default output and the default input are shown in bold, Bluetooth devices show their battery level, and clicking a device makes it the default (§7.11, §7.12). |
 | FR-20 | The menu shows the current default input device between the output and volume lines (§5.3). |
 | FR-21 | Planned (M8). The user can choose one input device that is kept active: while it is connected, Feel the Noize reverts every change of the default input to it (§7.13). |
+| FR-22 | The menu has a volume slider for the current output above the device sections; moving it unmutes (§5.3, §7.5). |
 
 ### Non-Functional
 
@@ -152,14 +153,16 @@ Output: AirPods Pro                (disabled info item; "(Dial off)" appended wh
 Input: MOTU M2                     (disabled info item)
 Volume: 42 %                       (disabled info item)
 ─────────────
+Volume                             (bold heading)
+[🎧━━━━━━━●──────────]             (volume slider)
 Output                             (section header)
-AirPods Pro                        (bold: default output)
-MacBook Pro Speakers
-MOTU M2
+(●) **AirPods Pro**                (accent circle and bold: default output)
+(○) MacBook Pro Speakers           (gray circle)
+(○) MOTU M2
 Input                              (section header)
-AirPods Pro
-MacBook Pro Microphone
-MOTU M2                            (bold: default input)
+(○) AirPods Pro
+(○) MacBook Pro Microphone
+(●) **MOTU M2**                    (accent circle and bold: default input)
 ─────────────
 Mute                         ✓     (toggles mute; state reflects mute)
 ─────────────
@@ -171,7 +174,9 @@ Quit Feel the Noize                ⌘Q
 
 **Planned additions (M7, M8, FR-19, FR-21):** the battery text after a device name in both sections, for example "AirPods Pro    L 80 %, R 75 %, case 40 %" (§7.12), and "(kept)" after the Input line when the default input is the kept device (§7.13).
 
-The Input line reads "Input: None" without an input device. Device items are commands, so they use the regular menu font and label color; a section without devices is left out. Details in §7.11.
+The Input line reads "Input: None" without an input device. Device items are commands, so they use the regular menu font and label color. Each carries a device symbol in a circle, as in the macOS Sound menu: the default device of its section has an accent circle with a white glyph and a bold title, the others a gray circle. A section without devices is left out. Details in §7.11.
+
+The volume slider is an `NSSlider` (0…1, continuous) in a custom item view below a bold "Volume" heading, both inset 14 pt like the section headers, and widened with the menu. Its look follows the macOS Sound menu (requested by the developer 2026-10-21): `VolumeSlider` (`UI/VolumeSlider.swift`, an `NSSlider` subclass with a nested `NSSliderCell` that only replaces drawing) draws a 22 pt capsule track with a 1 pt border around the whole capsule, a white fill up to a white round knob as high as the track with a thin edge and a soft shadow, and at the left end a light gray glyph drawn above the knob, so it stays visible at zero. Colors are fixed values measured on a screenshot of the Sound menu in light mode (track `#D8D8D8`, border `#C6C6C6` on the menu background `#EBEBEB`); the dark values are estimates. The slider returns `allowsVibrancy = false`, because the menu's vibrant material would otherwise blend them and lower the contrast. The glyph is the output's headphone symbol for headphones and AirPods, otherwise `speaker.wave.2.fill` (`DeviceIcon.sliderSymbolName(for:)`). The bar spans the whole cell and the knob is as thick as the bar, so the default tracking puts the knob under the pointer. Disabled, fill and knob are drawn at half opacity. It shows the volume of the current output and stands at zero while muted, like the system Sound menu. It is disabled without an output device, for a device without volume control (then at its fixed full level) and while another device owns the output (§7.4, "Rejected writes"). Moving it unmutes first, then sets the volume through `AudioOutput`, including software volume; like the menu's Mute it gives no haptics and no overlay, and it ignores whether the output is selected in the Devices tab, since that setting concerns the Dial only.
 
 The three status lines use the menu font at the small system size and the secondary label color, so they read as information rather than commands; their text is always set through `attributedTitle`. The battery part appears only while the level is known (§7.10). The menu is built once. Titles and states are set on every state change, so they stay current while the menu is open, for example while the Dial turns. When HID access is denied (§9.2), an extra item "Allow Input Monitoring…" appears below the Dial status line. Without an output device the lines read "Output: None" and "Volume: –". "Mute" is disabled when the device has neither a mute control nor software volume. The menu's Mute item sets mute on `AudioOutput` directly, without haptics or overlay, which belong to Dial gestures.
 
@@ -460,7 +465,7 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 **Shared property access.** The Core Audio property helpers live in `CoreAudioProperty` (caseless enum): default output and input device read and write, device lookup by UID, device list, stream presence per scope, hidden flag, transport type, UID and name strings, settability, volume and mute read and write, and the shared `ListenerBlock` type. `AudioOutput` and `AudioDeviceList` both use it.
 
-**Device list.** `AudioDeviceList` lists the visible devices that have output or input streams as `AudioDeviceInfo` (UID, name, transport, `hasOutput`, `hasInput`, `canSetVolume`, `hasHardwareMute`, computed `isControllable`; volume and mute describe the output) plus the default output and default input UID. It listens to `kAudioHardwarePropertyDevices` and both default devices on the system object and reloads on any change. The Devices tab owns one, started in `viewWillAppear()` and stopped in `viewDidDisappear()`, and shows only devices with `hasOutput`; the status menu owns another while it is open (§7.11). No listener stays registered while both are closed.
+**Device list.** `AudioDeviceList` lists the visible devices that have output or input streams as `AudioDeviceInfo` (UID, name, transport, `modelUID`, `outputDataSource`, `hasOutput`, `hasInput`, `canSetVolume`, `hasHardwareMute`, computed `isControllable`; volume and mute describe the output) plus the default output and default input UID. It listens to `kAudioHardwarePropertyDevices` and both default devices on the system object and reloads on any change. The Devices tab owns one, started in `viewWillAppear()` and stopped in `viewDidDisappear()`, and shows only devices with `hasOutput`; the status menu owns another while it is open (§7.11). No listener stays registered while both are closed.
 
 **Errors.** `CoreAudioError` and `OSStatus.throwIfError(_:)` are ported from Push to Hush (`CoreAudioSource.swift`), with the four-character-code rendering corrected to most-significant byte first. Failures are logged under the `audio` category; the cached state stays at the last confirmed value.
 
@@ -468,7 +473,7 @@ Core Audio identifies a listener by its block pointer. The listener closures are
 
 - `StatusItemController` creates an `NSStatusItem` with `squareLength`, sets the menu from §5.3 and implements `NSMenuDelegate`. `update(audio:dial:isOutputEnabled:)` changes the button image, `appearsDisabled` and every menu title and state, so the volume follows the Dial and a retry result shows while the menu is open. The HID manager and the Core Audio listeners deliver during menu tracking (common run loop modes and the main queue). `menuWillOpen(_:)` calls `onMenuWillOpen`, which `AppDelegate` uses for `DialDevice.retryIfInUseElsewhere()`.
 - Images: `VolumePresentation.knobImage(for:style:size:accessibilityDescription:)` maps the audio state to a `KnobIcon` template image (§5.2); `StatusItemController.iconStyle` and `VolumeOverlay.iconStyle` are set by `AppDelegate` from `Settings.iconStyle`. Accessibility description states volume and mute, e.g. "Volume 42 %, muted", plus ", Surface Dial not connected" when applicable. Percentage text ("42 %") and accessibility text also live in `VolumePresentation`, shared by the status item and the overlay.
-- `StatusItemController` reports menu actions through `onToggleMute`, `onOpenSettings`, `onSelectOutput` and `onSelectInput` (§7.11); "Allow Input Monitoring…" and "About Feel the Noize" are handled inside it.
+- `StatusItemController` reports menu actions through `onToggleMute`, `onSetVolume` (the slider, handled by `AppDelegate.setVolumeFromMenu(_:)`), `onOpenSettings`, `onSelectOutput` and `onSelectInput` (§7.11); "Allow Input Monitoring…" and "About Feel the Noize" are handled inside it.
 - `VolumeOverlay.show(_:)` is called from `DialController.onAdjusted` and respects the `showOverlay` setting (checked in `AppDelegate`).
 
 ### 7.6 SettingsWindowController
@@ -578,9 +583,25 @@ The menu lists every connected output and input device and switches the default 
 
 **Device list.** `AudioDeviceInfo` has `hasOutput` and `hasInput`. `AudioDeviceList` lists every visible device with output or input streams (`CoreAudioProperty.hasStreams(_:scope:)`), publishes the default output and the default input UID, and also observes `kAudioHardwarePropertyDefaultInputDevice`. The Devices tab keeps showing only devices with `hasOutput`. A device with both directions, such as AirPods or the MOTU M2, appears in both menu sections; the built-in speakers and the built-in microphone are separate Core Audio devices. The software volume aggregate stays filtered (§7.9).
 
-**Lifetime.** `StatusItemController` owns its own `AudioDeviceList`, started when the menu opens and stopped in `menuDidClose(_:)`. The list therefore stays current while the menu is open, for example when AirPods connect, and registers no listener while the menu is closed (NFR-2). On every list change the device items after the separator below the Volume line are removed and rebuilt; that separator is hidden while there are no device items, so it does not double the one above Mute.
+**Lifetime.** `StatusItemController` owns its own `AudioDeviceList`, started when the menu opens and stopped in `menuDidClose(_:)`. The list therefore stays current while the menu is open, for example when AirPods connect, and registers no listener while the menu is closed (NFR-2). On every list change the device items after the volume slider are removed and rebuilt.
 
-**Items.** Each section starts with `NSMenuItem.sectionHeader(title:)`, "Output" and "Input", sorted by name like the Devices tab (`StatusItemController.deviceSections(_:)`, `localizedStandardCompare`); a section without devices is left out. A device item uses the regular menu font through `attributedTitle` and carries its UID as `representedObject`; the default device of its section uses the bold system font at the menu font size. The battery text (§7.12, M7) will follow the name in the secondary label color, right-aligned with a tab stop. A device appears in the menu only while it is connected; remembered devices stay in the Devices tab.
+**Items.** Each section starts with `NSMenuItem.sectionHeader(title:)`, "Output" and "Input", sorted by name like the Devices tab (`StatusItemController.deviceSections(_:)`, `localizedStandardCompare`); a section without devices is left out. A device item uses the regular menu font, the default device of its section the bold system font at the menu font size through `attributedTitle`, and carries its UID as `representedObject` and a `DeviceIcon` image (below). The battery text (§7.12, M7) will follow the name in the secondary label color, right-aligned with a tab stop. A device appears in the menu only while it is connected; remembered devices stay in the Devices tab.
+
+**Icons.** Chosen by the developer on 2026-10-21 over plain template symbols, keeping the bold default title as well: `DeviceIcon` (`UI/DeviceIcon.swift`, caseless enum) draws a 26 pt circle with an SF Symbol at 13 pt in hierarchical rendering, measured on a screenshot of the macOS Sound menu. The default device of a section gets `controlAccentColor` with a white glyph, every other device `quaternaryLabelColor` with a `labelColor` glyph; the colors resolve at draw time, so light and dark mode and the accent color follow. The image carries "current output" or "current input" as accessibility description for the default. Core Audio offers no artwork (`kAudioDevicePropertyIcon` exists on none of the devices probed on 2026-10-21), so `AudioDeviceInfo` also carries `modelUID` and `outputDataSource`, and the symbol follows these rules:
+
+| Device | Symbol |
+|---|---|
+| built-in, output data source `hdpn` (headphone jack) | `headphones` |
+| built-in, name contains "MacBook" / "iMac" (system names keep the product name in every language) | `macbook` / `desktopcomputer` |
+| Bluetooth, model UID "<product> <vendor>" in hex with Apple vendor `4c` and a known product ID | `airpods`, `airpods.gen3`, `airpods.gen4`, `airpods.pro`, `airpods.max` |
+| other Bluetooth | `headphones` |
+| HDMI, DisplayPort | `display` |
+| AirPlay | `airplayaudio` |
+| anything else, including USB interfaces and the Continuity Camera microphone, as in the Sound menu | output `speaker.wave.2.fill`, input `mic.fill` |
+
+The Sound menu also lists AirPlay destinations such as a HomePod, which Core Audio does not offer as devices; Feel the Noize shows them only while one is the current output.
+
+The product IDs come from public device lists; only AirPods Max (USB-C, `201f 4c`) is verified on hardware. A wrong or new ID only falls back to `headphones`.
 
 **Switching.** Clicking calls `onSelectOutput(uid)` or `onSelectInput(uid)`. `AppDelegate.selectDefaultDevice(_:scope:)` translates the UID with `kAudioHardwarePropertyTranslateUIDToDevice` (`CoreAudioProperty.readDevice(uid:)`) and writes `kAudioHardwarePropertyDefaultOutputDevice` or `kAudioHardwarePropertyDefaultInputDevice` through `CoreAudioProperty.writeDefaultDevice(_:scope:)`; a device that disconnected in the meantime is logged and skipped. `AudioOutput` follows the new output through its existing listener, and the open menu through its device list. While an input is kept (§7.13, M8), selecting an input will move the keep to that device.
 
@@ -748,6 +769,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 | `SettingsTests` | defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
 | `AudioDeviceInfoTests` | Core Audio transport type mapping including unknown values, `isControllable` |
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
+| `DeviceIconTests` | slider symbol for headphones, speakers and no output; symbol per transport, direction, built-in name and data source, and Apple product ID; product ID parsing; every chosen symbol exists; circle image size, non-template, accessibility description, transparent corners |
 | `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |
 | `StatusItemTitleTests` | Dial status line for each connection state, with and without a battery level; Input line with and without a device; device sections split by direction and sorted by name, a device with both directions in both |
 | `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture; rotation on an output owned by another device probes and buzzes once per gesture |
@@ -777,6 +799,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 19. Quit Feel the Noize and leave the Dial untouched until it sleeps, then launch Feel the Noize: the menu says Not Connected; touch the Dial: ready click, then turning works. Launch with the Dial awake: no click. Passed 2026-10-19 on the release build: the developer felt the ready click after touching a Dial asleep at launch; with the Dial awake at launch the debug log shows no trigger, only the configuration and an immediate keep-alive.
 20. Turn the display off with Ctrl+Shift+Power, then turn the Dial: the display turns on. Use only the Dial for 6 minutes: the screen saver does not start; it starts about 5 minutes after the last turn. Passed 2026-10-19: display wake, and with the screen saver delay set to 60 s for the test, loginwindow logged "PMDisplaySleepIsBlocked IS blocked … Surface Dial in use" and did not start the screen saver at 105, 165, 225 and 285 s of keyboard and trackpad idle; it started 37 s after the hold timed out, 5 min 37 s after the last turn.
 21. Play audio on the iPhone through AirPods that are also connected to the Mac, select the AirPods as the Mac output and turn the Dial: buzz, icon dimmed, menu "Volume: in use by another device", no flicker. Play audio on the Mac so the AirPods move to it, then turn: the volume changes within about a second. Passed 2026-10-19: rejection detected at 13:00:56 on the first turn; after the AirPods moved to the Mac, the probe at 13:01:22.684 stood and the rejection cleared 258 ms later.
+22. Drag the menu's volume slider: the volume follows continuously, the Volume line and the icon too; turning the Dial with the menu open moves the slider. While muted the slider stands at zero and dragging it unmutes. Disabled for a device without volume control. Software volume follows the slider.
 
 ## 12. Project Structure and Build
 
@@ -801,7 +824,7 @@ FeelTheNoize/
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
 │   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
 │   │                              DeviceSettingsViewController.swift, VolumePresentation.swift,
-│   │                              KnobIcon.swift
+│   │                              KnobIcon.swift, DeviceIcon.swift, VolumeSlider.swift
 │   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift, UserActivity.swift
 │   └── Resources/                 Assets.xcassets
 └── Tests/FeelTheNoizeTests/      Swift Testing suites (from M2)

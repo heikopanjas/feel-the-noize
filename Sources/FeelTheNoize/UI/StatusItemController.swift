@@ -8,6 +8,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private static let inputMonitoringSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 
     var onToggleMute: (() -> Void)?
+    /// Called continuously while the volume slider moves, with the new volume 0…1.
+    var onSetVolume: ((Float32) -> Void)?
     var onOpenSettings: (() -> Void)?
     /// Lets the owner retry a Dial held by another process while the user looks at the menu.
     var onMenuWillOpen: (() -> Void)?
@@ -25,8 +27,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let inputItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let volumeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let muteItem = NSMenuItem(title: "Mute", action: #selector(toggleMute(_:)), keyEquivalent: "")
-    /// The device sections are inserted right after this separator.
-    private let deviceSeparator = NSMenuItem.separator()
+    private let volumeSlider = VolumeSlider()
+    /// The device sections are inserted right after the slider.
+    private let sliderItem = NSMenuItem()
     private let deviceList = AudioDeviceList()
     private var deviceItems: [NSMenuItem] = []
     private var audio: AudioState?
@@ -35,12 +38,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var dialBatteryLevel: Int?
     /// The status lines at the top are information, not commands, so they use a smaller font than the menu items.
     private static let iconSize: CGFloat = 18
+    /// Slider row measured on the macOS Sound menu: a bold heading above the slider, both lined up with the section
+    /// headers. AppKit widens the row to the menu.
+    private static let sliderRowWidth: CGFloat = 240
+    private static let sliderInset: CGFloat = 14
+    private static let sliderBottomPadding: CGFloat = 8
+    private static let headingSpacing: CGFloat = 6
+    private static let headingTopPadding: CGFloat = 2
     private static let infoAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
         .foregroundColor: NSColor.secondaryLabelColor
     ]
-    /// Device items are commands in the regular menu font; the default device of a section is bold.
-    private static let deviceAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.menuFont(ofSize: 0)]
+    /// The default device of a section is also bold, in addition to the accent circle of its icon.
     private static let defaultDeviceAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.boldSystemFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize)
     ]
@@ -103,6 +112,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         accessItem.target = self
         accessItem.isHidden = true
         muteItem.target = self
+        buildSliderItem()
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings(_:)), keyEquivalent: ",")
         settingsItem.target = self
@@ -111,12 +121,37 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let quitItem = NSMenuItem(title: "Quit Feel the Noize", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for item in [
-            dialItem, accessItem, outputItem, inputItem, volumeItem, deviceSeparator, .separator(), muteItem, .separator(), settingsItem,
-            aboutItem, .separator(), quitItem
+            dialItem, accessItem, outputItem, inputItem, volumeItem, .separator(), sliderItem, .separator(), muteItem, .separator(),
+            settingsItem, aboutItem, .separator(), quitItem
         ] {
             menu.addItem(item)
         }
         statusItem.menu = menu
+    }
+
+    private func buildSliderItem() {
+        let heading = NSTextField(labelWithString: "Volume")
+        heading.font = .boldSystemFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize)
+        heading.sizeToFit()
+        heading.setAccessibilityElement(false)
+
+        let sliderHeight = VolumeSlider.trackHeight
+        let headingY = Self.sliderBottomPadding + sliderHeight + Self.headingSpacing
+        let row = NSView(
+            frame: NSRect(x: 0, y: 0, width: Self.sliderRowWidth, height: headingY + heading.frame.height + Self.headingTopPadding))
+        row.autoresizingMask = [.width]
+        heading.setFrameOrigin(NSPoint(x: Self.sliderInset, y: headingY))
+        heading.autoresizingMask = [.maxXMargin]
+
+        volumeSlider.frame = NSRect(
+            x: Self.sliderInset, y: Self.sliderBottomPadding, width: Self.sliderRowWidth - 2 * Self.sliderInset, height: sliderHeight)
+        volumeSlider.autoresizingMask = [.width]
+        volumeSlider.target = self
+        volumeSlider.action = #selector(volumeSliderChanged(_:))
+        volumeSlider.setAccessibilityLabel("Volume")
+        row.addSubview(heading)
+        row.addSubview(volumeSlider)
+        sliderItem.view = row
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -146,6 +181,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 Self.setInfoTitle(volumeItem, "Volume: \(VolumePresentation.percent(state.volume))\(suffix)")
         }
 
+        // Like the system Sound menu, the slider stands at zero while muted; a device without volume control shows its fixed
+        // full level, disabled.
+        volumeSlider.doubleValue = Double(audio.map { $0.isMuted ? 0 : $0.volume } ?? 0)
+        volumeSlider.isEnabled = audio.map { $0.canSetVolume && !$0.isInUseElsewhere } ?? false
+        updateSliderSymbol()
+
         muteItem.state = audio?.isMuted == true ? .on : .off
         muteItem.isEnabled = audio.map { $0.hasHardwareMute || $0.canSetVolume } ?? false
     }
@@ -155,6 +196,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func deviceListChanged() {
         let defaultInput = deviceList.devices.first { $0.hasInput && $0.uid == deviceList.defaultInputUID }
         Self.setInfoTitle(inputItem, Self.inputTitle(defaultInput?.name))
+        updateSliderSymbol()
 
         guard let menu = statusItem.menu else { return }
         for item in deviceItems {
@@ -162,25 +204,41 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
         let sections = Self.deviceSections(deviceList.devices)
         deviceItems =
-            sectionItems("Output", devices: sections.outputs, defaultUID: deviceList.defaultOutputUID, action: #selector(selectOutput(_:)))
-            + sectionItems("Input", devices: sections.inputs, defaultUID: deviceList.defaultInputUID, action: #selector(selectInput(_:)))
-        let start = menu.index(of: deviceSeparator) + 1
+            sectionItems(.output, devices: sections.outputs, defaultUID: deviceList.defaultOutputUID)
+            + sectionItems(.input, devices: sections.inputs, defaultUID: deviceList.defaultInputUID)
+        let start = menu.index(of: sliderItem) + 1
         for (offset, item) in deviceItems.enumerated() {
             menu.insertItem(item, at: start + offset)
         }
-        // Without any device the separator would double the one above Mute.
-        deviceSeparator.isHidden = deviceItems.isEmpty
     }
 
-    /// A section without devices is left out entirely.
-    private func sectionItems(_ title: String, devices: [AudioDeviceInfo], defaultUID: String?, action: Selector) -> [NSMenuItem] {
+    /// The device list knows the transport and model the symbol depends on; it runs while the menu is open, the only time
+    /// the slider is visible.
+    private func updateSliderSymbol() {
+        let output = audio.flatMap { state in deviceList.devices.first { $0.uid == state.deviceUID } }
+        volumeSlider.symbolName = DeviceIcon.sliderSymbolName(for: output)
+    }
+
+    /// A section without devices is left out entirely. As in the macOS Sound menu, the default device is marked by the accent
+    /// circle of its icon, and its title is bold.
+    private func sectionItems(_ direction: DeviceIcon.Direction, devices: [AudioDeviceInfo], defaultUID: String?) -> [NSMenuItem] {
         guard !devices.isEmpty else { return [] }
+        let (title, action, current) =
+            switch direction {
+                case .output: ("Output", #selector(selectOutput(_:)), "current output")
+                case .input: ("Input", #selector(selectInput(_:)), "current input")
+            }
         let items = devices.map { device in
             let item = NSMenuItem(title: device.name, action: action, keyEquivalent: "")
             item.target = self
             item.representedObject = device.uid
-            let attributes = device.uid == defaultUID ? Self.defaultDeviceAttributes : Self.deviceAttributes
-            item.attributedTitle = NSAttributedString(string: device.name, attributes: attributes)
+            let isDefault = device.uid == defaultUID
+            if isDefault {
+                item.attributedTitle = NSAttributedString(string: device.name, attributes: Self.defaultDeviceAttributes)
+            }
+            item.image = DeviceIcon.image(
+                symbolName: DeviceIcon.symbolName(for: device, direction: direction), isDefault: isDefault,
+                accessibilityDescription: isDefault ? current : nil)
             return item
         }
         return [.sectionHeader(title: title)] + items
@@ -216,6 +274,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func toggleMute(_ sender: NSMenuItem) {
         onToggleMute?()
+    }
+
+    @objc private func volumeSliderChanged(_ sender: NSSlider) {
+        onSetVolume?(Float32(sender.doubleValue))
     }
 
     @objc private func selectOutput(_ sender: NSMenuItem) {

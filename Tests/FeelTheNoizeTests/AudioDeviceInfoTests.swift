@@ -18,6 +18,7 @@ struct AudioDeviceInfoTests {
             (kAudioDeviceTransportTypeVirtual, .virtual),
             (kAudioDeviceTransportTypeAggregate, .aggregate),
             (kAudioDeviceTransportTypeAutoAggregate, .aggregate),
+            (kAudioDeviceTransportTypeContinuityCaptureWired, .other),
             (kAudioDeviceTransportTypePCI, .other),
             (0, .other)
         ] as [(UInt32, AudioDeviceInfo.Transport)])
@@ -30,7 +31,8 @@ struct AudioDeviceInfoTests {
         arguments: [(true, true, true), (true, false, true), (false, true, true), (false, false, false)])
     func controllable(canSetVolume: Bool, hasHardwareMute: Bool, expected: Bool) {
         let device = AudioDeviceInfo(
-            uid: "x", name: "X", transport: .usb, hasOutput: true, hasInput: false, canSetVolume: canSetVolume,
+            uid: "x", name: "X", transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: true, hasInput: false,
+            canSetVolume: canSetVolume,
             hasHardwareMute: hasHardwareMute)
         #expect(device.isControllable == expected)
     }

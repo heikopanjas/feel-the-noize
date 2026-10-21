@@ -37,6 +37,7 @@ struct StatusItemTitleTests {
 
     private static func device(_ name: String, output: Bool, input: Bool) -> AudioDeviceInfo {
         AudioDeviceInfo(
-            uid: name, name: name, transport: .usb, hasOutput: output, hasInput: input, canSetVolume: output, hasHardwareMute: false)
+            uid: name, name: name, transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: output, hasInput: input, canSetVolume: output,
+            hasHardwareMute: false)
     }
 }

@@ -153,6 +153,11 @@ enum CoreAudioProperty {
         (try? readUInt32(kAudioDevicePropertyTransportType, of: deviceID)) ?? 0
     }
 
+    /// `nil` for devices without a selectable output source; most have none.
+    static func readOutputDataSource(of deviceID: AudioObjectID) -> UInt32? {
+        try? readUInt32(kAudioDevicePropertyDataSource, scope: kAudioDevicePropertyScopeOutput, of: deviceID)
+    }
+
     // MARK: - Software Volume
 
     /// The Core Audio process object of Feel the Noize itself, so a tap can leave its own audio out.
@@ -183,9 +188,10 @@ enum CoreAudioProperty {
         return buffers.map { Int($0.mNumberChannels) }
     }
 
-    private static func readUInt32(_ selector: AudioObjectPropertySelector, of deviceID: AudioObjectID) throws -> UInt32 {
-        var address = AudioObjectPropertyAddress(
-            mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    private static func readUInt32(
+        _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, of deviceID: AudioObjectID
+    ) throws -> UInt32 {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
         var value: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
         try AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value).throwIfError("Reading a device property")

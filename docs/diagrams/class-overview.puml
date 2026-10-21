@@ -163,6 +163,10 @@ package "UI" {
         + {static} image(style : Style, level : Float, isMuted : Bool, size : CGFloat) : NSImage
         + {static} pointerDegrees(for : Float) : CGFloat
     }
+    class DeviceIcon <<enum>> {
+        + {static} symbolName(for : AudioDeviceInfo, direction : Direction) : String
+        + {static} image(symbolName : String, isDefault : Bool) : NSImage
+    }
     class VolumePresentation <<enum>> {
         + {static} knobImage(for : AudioState?, style : KnobIcon.Style, size : CGFloat) : NSImage
         + {static} percent(volume : Float32) : String
@@ -233,6 +237,7 @@ GeneralSettingsViewController ..> Settings : edits
 GeneralSettingsViewController ..> LoginItem : toggles
 DeviceSettingsViewController *-- AudioDeviceList
 StatusItemController *-- AudioDeviceList
+StatusItemController ..> DeviceIcon : draws
 DeviceSettingsViewController ..> Settings : selects devices
 AudioDeviceList ..> AudioDeviceInfo : lists
 AudioOutput ..> CoreAudioProperty : uses

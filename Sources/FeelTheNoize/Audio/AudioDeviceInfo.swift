@@ -48,6 +48,10 @@ struct AudioDeviceInfo: Equatable {
     let uid: String
     let name: String
     let transport: Transport
+    /// Bluetooth devices report product and vendor ID in hex, for example `201f 4c` for AirPods Max; `nil` if unreadable.
+    let modelUID: String?
+    /// `hdpn` marks the built-in headphone jack; `nil` without a data source.
+    let outputDataSource: UInt32?
     let hasOutput: Bool
     let hasInput: Bool
     /// Volume and mute describe the output; they are false for an input-only device.

@@ -37,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.onToggleMute = { [weak self] in
             self?.toggleMuteFromMenu()
         }
+        statusItem.onSetVolume = { [weak self] volume in
+            self?.setVolumeFromMenu(volume)
+        }
         statusItem.onOpenSettings = { [weak self] in
             self?.showSettings()
         }
@@ -145,6 +148,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func toggleMuteFromMenu() {
         guard let state = audio.state else { return }
         audio.setMuted(!state.isMuted)
+    }
+
+    /// Moving the slider unmutes, as in the system Sound menu. No haptics and no overlay, as for the menu's Mute.
+    private func setVolumeFromMenu(_ volume: Float32) {
+        guard let state = audio.state, state.canSetVolume else { return }
+        if state.isMuted {
+            audio.setMuted(false)
+        }
+        audio.setVolume(volume)
     }
 
     /// `AudioOutput` and the open menu follow the new default through their own listeners (docs/DESIGN.md §7.11).

@@ -75,7 +75,8 @@ final class AudioDeviceList {
         else { return nil }
         return AudioDeviceInfo(
             uid: uid, name: name, transport: .init(coreAudioTransportType: CoreAudioProperty.readTransportType(of: deviceID)),
-            hasOutput: hasOutput, hasInput: hasInput,
+            modelUID: try? CoreAudioProperty.readString(kAudioDevicePropertyModelUID, of: deviceID),
+            outputDataSource: hasOutput ? CoreAudioProperty.readOutputDataSource(of: deviceID) : nil, hasOutput: hasOutput, hasInput: hasInput,
             canSetVolume: hasOutput && CoreAudioProperty.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID),
             hasHardwareMute: hasOutput && CoreAudioProperty.isSettable(CoreAudioProperty.muteAddress, of: deviceID))
     }
