@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.12, review 3.4: DialDevice to the Swift skill)
+
+- `DialDevice` rewritten to the swift-coding-conventions skill; the report handling after parsing moved into `handle(_:)` so no guard follows a statement. The IOKit session, callback and `nonisolated(unsafe)` hand-over code is unchanged apart from the style rules. `DialEvent` and `DialConnection` have no code to change. Reason: `Docs/CODE_REVIEW.md` §3; checklist items 1 to 4 and 11 to 13 cover it on hardware.
+- version bump: 1.2.11 to 1.2.12 (PATCH - style refactoring)
+
 ### 2026-10-22 (v1.2.11, review 3.3: audio adapters to the Swift skill)
 
 - `CoreAudioProperty` and `SoftwareVolume` rewritten to the swift-coding-conventions skill (`AudioOutput`, `AudioDeviceList` and `InputDeviceKeeper` were already rewritten in 4.1); the IO block body moved into two `nonisolated static` helpers, `render` and `silence`, with the same per-sample loops, no allocation, no lock and no log. Reason: `Docs/CODE_REVIEW.md` §3; the real-time constraints of DESIGN.md §7.9 are unchanged.

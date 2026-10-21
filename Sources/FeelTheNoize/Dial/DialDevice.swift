@@ -15,7 +15,12 @@ final class DialDevice: HapticFeedback {
     /// Whether IOKit sees an awake Dial, adopted or not. Matching callbacks arrive asynchronously, so this is the only way
     /// to tell right after `start()` or a rebuild.
     var isPresent: Bool {
-        guard let manager, let devices = IOHIDManagerCopyDevices(manager) else { return false }
+        guard let manager = self.manager else {
+            return false
+        }
+        guard let devices = IOHIDManagerCopyDevices(manager) else {
+            return false
+        }
         return CFSetGetCount(devices) > 0
     }
 
@@ -39,72 +44,79 @@ final class DialDevice: HapticFeedback {
     private let buzzStop = DelayedAction()
     private var wakeObserver: (any NSObjectProtocol)?
 
-    func start() {
-        guard manager == nil else { return }
-        observeWake()
-        openManager()
+    func start() -> Void {
+        guard self.manager == nil else {
+            return
+        }
+        self.observeWake()
+        self.openManager()
     }
 
-    func stop() {
-        rebuild.cancel()
-        buzzStop.cancel()
-        if let wakeObserver {
+    func stop() -> Void {
+        self.rebuild.cancel()
+        self.buzzStop.cancel()
+        if let wakeObserver = self.wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
-        wakeObserver = nil
-        closeManager()
+        self.wakeObserver = nil
+        self.closeManager()
     }
 
     /// Another process may have released the Dial. IOKit sends no notification for that, so the app retries on occasions
     /// the user causes (menu opened, app activated) instead of polling.
-    func retryIfInUseElsewhere() {
-        guard connection == .inUseElsewhere, manager != nil else { return }
-        Log.dial.info("Retrying a Surface Dial held by another process")
-        closeManager(keepingConnection: true)
-        openManager()
-        // Matching callbacks arrive asynchronously; if the Dial vanished meanwhile, none will, so check right away.
-        if isPresent {
+    func retryIfInUseElsewhere() -> Void {
+        guard self.connection == .inUseElsewhere else {
             return
         }
-        blockedDevice = nil
-        setConnection(.notConnected)
+        guard self.manager != nil else {
+            return
+        }
+        Log.dial.info("Retrying a Surface Dial held by another process")
+        self.closeManager(keepingConnection: true)
+        self.openManager()
+        // Matching callbacks arrive asynchronously; if the Dial vanished meanwhile, none will, so check right away.
+        if self.isPresent == true {
+            return
+        }
+        self.blockedDevice = nil
+        self.setConnection(.notConnected)
     }
 
     /// Stored while disconnected and applied on the next match.
-    func configure(detentsPerRevolution: Int, hapticsEnabled: Bool) {
+    func configure(detentsPerRevolution: Int, hapticsEnabled: Bool) -> Void {
         self.detentsPerRevolution = detentsPerRevolution
         self.hapticsEnabled = hapticsEnabled
-        sendConfiguration()
+        self.sendConfiguration()
     }
 
     // MARK: - Haptic Feedback
 
-    func endStop() {
-        playHaptic(.buzz)
-        buzzStop.schedule(after: Self.endStopBuzzDuration) { [weak self] in
+    func endStop() -> Void {
+        self.playHaptic(.buzz)
+        self.buzzStop.schedule(after: Self.endStopBuzzDuration) { [weak self] in
             self?.sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
         }
     }
 
-    func muteToggled(isMuted: Bool) {
-        if isMuted {
-            playHaptic(.click, repeatCount: 1, retriggerMilliseconds: 120)
+    func muteToggled(isMuted: Bool) -> Void {
+        if isMuted == true {
+            self.playHaptic(.click, repeatCount: 1, retriggerMilliseconds: 120)
         }
         else {
-            playHaptic(.click)
+            self.playHaptic(.click)
         }
     }
 
     /// Calls while disconnected are ignored.
-    func playHaptic(_ waveform: HapticWaveform, repeatCount: UInt8 = 0, retriggerMilliseconds: UInt16 = 0) {
+    func playHaptic(_ waveform: HapticWaveform, repeatCount: UInt8 = 0, retriggerMilliseconds: UInt16 = 0) -> Void {
         // A new waveform replaces a running buzz, so a pending Stop would only cut the new one short.
-        buzzStop.cancel()
-        sendTrigger(waveform, repeatCount: repeatCount, retriggerMilliseconds: retriggerMilliseconds)
+        self.buzzStop.cancel()
+        self.sendTrigger(waveform, repeatCount: repeatCount, retriggerMilliseconds: retriggerMilliseconds)
     }
 
-    private func sendTrigger(_ waveform: HapticWaveform, repeatCount: UInt8, retriggerMilliseconds: UInt16) {
+    private func sendTrigger(_ waveform: HapticWaveform, repeatCount: UInt8, retriggerMilliseconds: UInt16) -> Void {
         let bytes = DialReport.manualTrigger(waveform: waveform, repeatCount: repeatCount, retriggerMilliseconds: retriggerMilliseconds)
-        sendReport(kIOHIDReportTypeOutput, bytes)
+        self.sendReport(kIOHIDReportTypeOutput, bytes)
     }
 
     // MARK: - Keep Awake
@@ -112,20 +124,22 @@ final class DialDevice: HapticFeedback {
     /// Sends the three reports that together kept the Dial awake in the spike of 2026-10-18 (Docs/DESIGN.md §7.14). Which
     /// of them the Dial counts as activity is not known, so all three are sent; each is harmless on its own. Calls while
     /// disconnected are ignored.
-    func sendKeepAlive() {
-        guard let device else { return }
+    func sendKeepAlive() -> Void {
+        guard let device = self.device else {
+            return
+        }
         var buffer = [UInt8](repeating: 0, count: 8)
         var length = CFIndex(buffer.count)
         let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, CFIndex(DialReport.reportID), &buffer, &length)
         let bytes = Self.hex(Array(buffer.prefix(length)))
         Log.dial.debug("Keep-alive feature report read: \(Self.describe(result), privacy: .public), \(bytes, privacy: .public)")
-        sendReport(kIOHIDReportTypeFeature, configurationReport(), to: device)
-        sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
+        self.sendReport(kIOHIDReportTypeFeature, self.configurationReport(), to: device)
+        self.sendTrigger(.stop, repeatCount: 0, retriggerMilliseconds: 0)
     }
 
     // MARK: - Session
 
-    private func openManager() {
+    private func openManager() -> Void {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         let matching = [kIOHIDVendorIDKey: DialReport.vendorID, kIOHIDProductIDKey: DialReport.productID] as CFDictionary
         IOHIDManagerSetDeviceMatching(manager, matching)
@@ -154,7 +168,7 @@ final class DialDevice: HapticFeedback {
             case kIOReturnSuccess:
                 Log.dial.info("HID manager opened in \(mode, privacy: .public) mode")
             case kIOReturnNotPermitted:
-                handleAccessDenied()
+                self.handleAccessDenied()
             case kIOReturnExclusiveAccess:
                 // The matching callback still fires for the held device and marks it as in use elsewhere.
                 Log.dial.notice("Another process holds the Surface Dial exclusively")
@@ -164,37 +178,41 @@ final class DialDevice: HapticFeedback {
     }
 
     /// `keepingConnection` leaves the published state alone during a retry, so the menu does not flicker to "Not Connected".
-    private func closeManager(keepingConnection: Bool = false) {
-        guard let manager else { return }
+    private func closeManager(keepingConnection: Bool = false) -> Void {
+        guard let manager = self.manager else {
+            return
+        }
         IOHIDManagerRegisterDeviceMatchingCallback(manager, nil, nil)
         IOHIDManagerRegisterDeviceRemovalCallback(manager, nil, nil)
         IOHIDManagerRegisterInputReportCallback(manager, nil, nil)
         IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
         IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         self.manager = nil
-        if keepingConnection {
-            resetDeviceState()
+        if keepingConnection == true {
+            self.resetDeviceState()
         }
         else {
-            deviceDidDisappear()
+            self.deviceDidDisappear()
         }
     }
 
-    private func handleAccessDenied() {
+    private func handleAccessDenied() -> Void {
         Log.dial.error("Opening the HID manager is not permitted")
-        if !hasRequestedAccess {
-            hasRequestedAccess = true
+        if self.hasRequestedAccess == false {
+            self.hasRequestedAccess = true
             // Shows the system Input Monitoring prompt once per launch.
             _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         }
-        onAccessDenied?()
+        self.onAccessDenied?()
     }
 
     // MARK: - Recovery
 
-    private func observeWake() {
-        guard wakeObserver == nil else { return }
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+    private func observeWake() -> Void {
+        guard self.wakeObserver == nil else {
+            return
+        }
+        self.wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -204,10 +222,12 @@ final class DialDevice: HapticFeedback {
     }
 
     /// A pending rebuild is cancelled and rescheduled if another trigger arrives.
-    private func scheduleRebuild(reason: String) {
+    private func scheduleRebuild(reason: String) -> Void {
         Log.dial.notice("Rebuilding the HID session shortly: \(reason, privacy: .public)")
-        rebuild.schedule(after: Self.rebuildDelay) { [weak self] in
-            guard let self else { return }
+        self.rebuild.schedule(after: Self.rebuildDelay) { [weak self] in
+            guard let self = self else {
+                return
+            }
             self.closeManager()
             self.openManager()
         }
@@ -215,9 +235,9 @@ final class DialDevice: HapticFeedback {
 
     // MARK: - Device Callbacks
 
-    fileprivate func deviceMatched(_ matched: IOHIDDevice) {
-        if let device {
-            if !CFEqual(device, matched) {
+    fileprivate func deviceMatched(_ matched: IOHIDDevice) -> Void {
+        if let device = self.device {
+            if CFEqual(device, matched) == false {
                 Log.dial.notice("Ignoring an additional Surface Dial")
             }
             return
@@ -225,14 +245,17 @@ final class DialDevice: HapticFeedback {
 
         // A match alone does not mean the Dial is usable: when another process has seized it, IOKit still reports the
         // match but refuses every report. The haptic configuration is the first report, so its result decides.
-        let result = sendReport(kIOHIDReportTypeFeature, configurationReport(), to: matched)
+        let result = self.sendReport(kIOHIDReportTypeFeature, self.configurationReport(), to: matched)
         switch result {
             case kIOReturnExclusiveAccess:
                 Log.dial.notice("Surface Dial found, but another process holds it exclusively")
-                blockedDevice = matched
-                setConnection(.inUseElsewhere)
+                self.blockedDevice = matched
+                self.setConnection(.inUseElsewhere)
                 return
-            case kIOReturnNotOpen, kIOReturnNotPermitted:
+            case kIOReturnNotOpen:
+                Log.dial.error("Surface Dial found, but it could not be opened: \(Self.describe(result), privacy: .public)")
+                return
+            case kIOReturnNotPermitted:
                 Log.dial.error("Surface Dial found, but it could not be opened: \(Self.describe(result), privacy: .public)")
                 return
             default:
@@ -240,92 +263,115 @@ final class DialDevice: HapticFeedback {
                 break
         }
 
-        blockedDevice = nil
-        device = matched
-        isPressed = false
-        lastReportTime = ContinuousClock.now
+        self.blockedDevice = nil
+        self.device = matched
+        self.isPressed = false
+        self.lastReportTime = ContinuousClock.now
 
         let transport = IOHIDDeviceGetProperty(matched, kIOHIDTransportKey as CFString) as? String ?? "unknown"
         let maxInputSize = IOHIDDeviceGetProperty(matched, kIOHIDMaxInputReportSizeKey as CFString) as? Int ?? 0
         Log.dial.info("Surface Dial connected, transport \(transport, privacy: .public), max input report \(maxInputSize) bytes")
-        setConnection(.connected)
+        self.setConnection(.connected)
     }
 
-    fileprivate func deviceRemoved(_ removed: IOHIDDevice) {
-        if let blockedDevice, CFEqual(blockedDevice, removed) {
-            Log.dial.info("Surface Dial held by another process disappeared")
-            deviceDidDisappear()
-            return
+    fileprivate func deviceRemoved(_ removed: IOHIDDevice) -> Void {
+        if let blockedDevice = self.blockedDevice {
+            if CFEqual(blockedDevice, removed) == true {
+                Log.dial.info("Surface Dial held by another process disappeared")
+                self.deviceDidDisappear()
+                return
+            }
         }
-        guard let device, CFEqual(device, removed) else { return }
-        Log.dial.info("Surface Dial disconnected")
-        deviceDidDisappear()
+        if let device = self.device {
+            if CFEqual(device, removed) == true {
+                Log.dial.info("Surface Dial disconnected")
+                self.deviceDidDisappear()
+            }
+        }
     }
 
-    fileprivate func inputReportReceived(result: IOReturn, senderAddress: UInt, reportID: UInt32, bytes: [UInt8]) {
+    fileprivate func inputReportReceived(result: IOReturn, senderAddress: UInt, reportID: UInt32, bytes: [UInt8]) -> Void {
         guard result == kIOReturnSuccess else {
-            scheduleRebuild(reason: "input report error \(Self.describe(result))")
+            self.scheduleRebuild(reason: "input report error \(Self.describe(result))")
             return
         }
         // The manager reports for every matched device; only the first Dial is used.
-        guard let device, senderAddress == UInt(bitPattern: Unmanaged.passUnretained(device).toOpaque()) else { return }
+        guard let device = self.device else {
+            return
+        }
+        guard senderAddress == UInt(bitPattern: Unmanaged.passUnretained(device).toOpaque()) else {
+            return
+        }
 
         Log.dial.debug("Input report ID \(reportID), \(bytes.count) bytes: \(Self.hex(bytes), privacy: .public)")
 
         let now = ContinuousClock.now
-        if let lastReportTime, now - lastReportTime >= Self.idleReconfigurationThreshold {
-            Log.dial.info("First report after idle, re-sending the haptic configuration")
-            sendConfiguration()
+        if let lastReportTime = self.lastReportTime {
+            if now - lastReportTime >= Self.idleReconfigurationThreshold {
+                Log.dial.info("First report after idle, re-sending the haptic configuration")
+                self.sendConfiguration()
+            }
         }
-        lastReportTime = now
+        self.lastReportTime = now
 
-        guard let report = DialReport.parseInput(reportID: reportID, bytes: bytes) else {
+        if let report = DialReport.parseInput(reportID: reportID, bytes: bytes) {
+            self.handle(report)
+        }
+        else {
             Log.dial.debug("Ignoring unrecognized input report")
-            return
         }
-        onActivity?()
+    }
 
-        if report.isPressed != isPressed {
-            isPressed = report.isPressed
-            onEvent?(isPressed ? .pressed : .released)
+    /// Button edges and rotation become events; every parsed report counts as activity.
+    private func handle(_ report: DialInputReport) -> Void {
+        self.onActivity?()
+        if report.isPressed != self.isPressed {
+            self.isPressed = report.isPressed
+            self.onEvent?(self.isPressed == true ? .pressed : .released)
         }
         if report.delta != 0 {
-            onEvent?(.rotated(detents: Int(report.delta)))
+            self.onEvent?(.rotated(detents: Int(report.delta)))
         }
     }
 
     // MARK: - Reports
 
-    private func deviceDidDisappear() {
-        resetDeviceState()
-        setConnection(.notConnected)
+    private func deviceDidDisappear() -> Void {
+        self.resetDeviceState()
+        self.setConnection(.notConnected)
     }
 
-    private func resetDeviceState() {
-        device = nil
-        blockedDevice = nil
-        isPressed = false
-        lastReportTime = nil
+    private func resetDeviceState() -> Void {
+        self.device = nil
+        self.blockedDevice = nil
+        self.isPressed = false
+        self.lastReportTime = nil
     }
 
-    private func setConnection(_ newConnection: DialConnection) {
-        guard newConnection != connection else { return }
-        connection = newConnection
-        onConnectionChange?(newConnection)
+    private func setConnection(_ newConnection: DialConnection) -> Void {
+        guard newConnection != self.connection else {
+            return
+        }
+        self.connection = newConnection
+        self.onConnectionChange?(newConnection)
     }
 
-    private func sendConfiguration() {
-        guard let device else { return }
-        sendReport(kIOHIDReportTypeFeature, configurationReport(), to: device)
+    private func sendConfiguration() -> Void {
+        guard let device = self.device else {
+            return
+        }
+        self.sendReport(kIOHIDReportTypeFeature, self.configurationReport(), to: device)
     }
 
     private func configurationReport() -> [UInt8] {
-        DialReport.hapticConfiguration(detentsPerRevolution: detentsPerRevolution, hapticsEnabled: hapticsEnabled)
+        return DialReport.hapticConfiguration(detentsPerRevolution: self.detentsPerRevolution, hapticsEnabled: self.hapticsEnabled)
     }
 
-    private func sendReport(_ type: IOHIDReportType, _ bytes: [UInt8]) {
-        guard let device else { return }
-        sendReport(type, bytes, to: device)
+    private func sendReport(_ type: IOHIDReportType, _ bytes: [UInt8]) -> Void {
+        guard let device = self.device else {
+            return
+        }
+        self.sendReport(type, bytes, to: device)
     }
 
     @discardableResult
@@ -345,7 +391,7 @@ final class DialDevice: HapticFeedback {
     }
 
     private static func hex(_ bytes: [UInt8]) -> String {
-        bytes.map { byte in
+        return bytes.map { byte in
             let digits = String(byte, radix: 16, uppercase: true)
             return byte < 0x10 ? "0" + digits : digits
         }
@@ -353,14 +399,17 @@ final class DialDevice: HapticFeedback {
     }
 
     private static func describe(_ result: IOReturn) -> String {
-        "0x" + String(UInt32(bitPattern: result), radix: 16)
+        return "0x" + String(UInt32(bitPattern: result), radix: 16)
     }
 
     private static func describe(_ access: IOHIDAccessType) -> String {
         switch access {
-            case kIOHIDAccessTypeGranted: "granted"
-            case kIOHIDAccessTypeDenied: "denied"
-            default: "unknown"
+            case kIOHIDAccessTypeGranted:
+                return "granted"
+            case kIOHIDAccessTypeDenied:
+                return "denied"
+            default:
+                return "unknown"
         }
     }
 }
@@ -373,8 +422,10 @@ final class DialDevice: HapticFeedback {
 
 nonisolated private func dialDeviceMatched(
     context: UnsafeMutableRawPointer?, result: IOReturn, sender: UnsafeMutableRawPointer?, device: IOHIDDevice
-) {
-    guard let context else { return }
+) -> Void {
+    guard let context = context else {
+        return
+    }
     let dialDevice = Unmanaged<DialDevice>.fromOpaque(context).takeUnretainedValue()
     // IOHIDDevice is not Sendable, but it never leaves the main thread: this callback runs on the main run loop.
     nonisolated(unsafe) let device = device
@@ -385,8 +436,10 @@ nonisolated private func dialDeviceMatched(
 
 nonisolated private func dialDeviceRemoved(
     context: UnsafeMutableRawPointer?, result: IOReturn, sender: UnsafeMutableRawPointer?, device: IOHIDDevice
-) {
-    guard let context else { return }
+) -> Void {
+    guard let context = context else {
+        return
+    }
     let dialDevice = Unmanaged<DialDevice>.fromOpaque(context).takeUnretainedValue()
     // See dialDeviceMatched.
     nonisolated(unsafe) let device = device
@@ -398,8 +451,10 @@ nonisolated private func dialDeviceRemoved(
 nonisolated private func dialInputReportReceived(
     context: UnsafeMutableRawPointer?, result: IOReturn, sender: UnsafeMutableRawPointer?, type: IOHIDReportType,
     reportID: UInt32, report: UnsafeMutablePointer<UInt8>, reportLength: CFIndex
-) {
-    guard let context else { return }
+) -> Void {
+    guard let context = context else {
+        return
+    }
     let dialDevice = Unmanaged<DialDevice>.fromOpaque(context).takeUnretainedValue()
     // Copy the bytes out; the buffer belongs to IOKit and is only valid during the callback.
     let bytes = Array(UnsafeBufferPointer(start: report, count: reportLength))
