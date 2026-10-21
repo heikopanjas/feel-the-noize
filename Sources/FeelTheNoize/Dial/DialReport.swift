@@ -1,17 +1,3 @@
-/// Waveform ordinals from the Dial's haptic waveform list (Docs/DESIGN.md §7.1).
-/// Ordinals 1 and 2 are the HID-defined None and Stop; 3 maps to Click (0x1003), 4 to Buzz Continuous (0x1004).
-enum HapticWaveform: UInt8 {
-    case stop = 2
-    case click = 3
-    case buzz = 4
-}
-
-/// Decoded payload of input report 1.
-struct DialInputReport: Equatable {
-    let isPressed: Bool
-    let delta: Int16
-}
-
 /// Pure encoder and decoder for the Surface Dial report layouts in Docs/DESIGN.md §7.1.
 /// All multi-byte fields are little-endian.
 enum DialReport {
@@ -22,31 +8,37 @@ enum DialReport {
     private static let inputPayloadLength = 8
     private static let maximumResolutionMultiplier = 3600
 
-    /// Accepts both buffer shapes seen on macOS: 9 bytes with the report ID first, or 8 bytes with the ID stripped.
     static func parseInput(reportID: UInt32, bytes: [UInt8]) -> DialInputReport? {
-        let payload: ArraySlice<UInt8>
-        if bytes.count == inputPayloadLength + 1, bytes[0] == self.reportID {
-            payload = bytes.dropFirst()
-        }
-        else if bytes.count == inputPayloadLength, reportID == UInt32(self.reportID) {
-            payload = bytes[...]
-        }
-        else {
+        guard let payload = Self.payload(reportID: reportID, bytes: bytes) else {
             return nil
         }
-
         let start = payload.startIndex
         let isPressed = payload[start] & 0x01 != 0
         let delta = Int16(bitPattern: UInt16(payload[start + 1]) | UInt16(payload[start + 2]) << 8)
         return DialInputReport(isPressed: isPressed, delta: delta)
     }
 
+    /// Accepts both buffer shapes seen on macOS: 9 bytes with the report ID first, or 8 bytes with the ID stripped.
+    private static func payload(reportID: UInt32, bytes: [UInt8]) -> ArraySlice<UInt8>? {
+        if bytes.count == Self.inputPayloadLength + 1 {
+            if bytes[0] == Self.reportID {
+                return bytes.dropFirst()
+            }
+        }
+        if bytes.count == Self.inputPayloadLength {
+            if reportID == UInt32(Self.reportID) {
+                return bytes[...]
+            }
+        }
+        return nil
+    }
+
     /// Feature report 1, including the report ID byte.
     static func hapticConfiguration(detentsPerRevolution: Int, hapticsEnabled: Bool) -> [UInt8] {
-        let multiplier = UInt16(min(max(detentsPerRevolution, 0), maximumResolutionMultiplier))
-        let autoTrigger: HapticWaveform = hapticsEnabled ? .click : .stop
+        let multiplier = UInt16(min(max(detentsPerRevolution, 0), Self.maximumResolutionMultiplier))
+        let autoTrigger: HapticWaveform = hapticsEnabled == true ? .click : .stop
         return [
-            reportID,
+            Self.reportID,
             UInt8(truncatingIfNeeded: multiplier),
             UInt8(truncatingIfNeeded: multiplier >> 8),
             0x00,  // repeat count
@@ -59,8 +51,8 @@ enum DialReport {
 
     /// Output report 1, including the report ID byte.
     static func manualTrigger(waveform: HapticWaveform, repeatCount: UInt8, retriggerMilliseconds: UInt16) -> [UInt8] {
-        [
-            reportID,
+        return [
+            Self.reportID,
             repeatCount,
             waveform.rawValue,
             UInt8(truncatingIfNeeded: retriggerMilliseconds),

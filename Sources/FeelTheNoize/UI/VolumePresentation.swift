@@ -6,8 +6,13 @@ enum VolumePresentation {
     /// knob shows full; without any output device it shows the minimum. The caller dims it where nothing can change.
     static func knobImage(for state: AudioState?, style: KnobIcon.Style, size: CGFloat, accessibilityDescription: String) -> NSImage {
         let level: Float32
-        if let state {
-            level = state.canSetVolume ? state.volume : 1
+        if let state = state {
+            if state.canSetVolume == true {
+                level = state.volume
+            }
+            else {
+                level = 1
+            }
         }
         else {
             level = 0
@@ -17,14 +22,26 @@ enum VolumePresentation {
     }
 
     static func percent(_ volume: Float32) -> String {
-        "\(Int((Double(volume) * 100).rounded())) %"
+        return "\(Int((Double(volume) * 100).rounded())) %"
     }
 
     /// For example "Volume 42 %, muted".
     static func accessibilityDescription(for state: AudioState?) -> String {
-        guard let state else { return "No output device" }
-        guard state.canSetVolume else { return state.isMuted ? "Volume not adjustable, muted" : "Volume not adjustable" }
-        guard !state.isInUseElsewhere else { return "Volume in use by another device" }
-        return state.isMuted ? "Volume \(percent(state.volume)), muted" : "Volume \(percent(state.volume))"
+        guard let state = state else {
+            return "No output device"
+        }
+        guard state.canSetVolume == true else {
+            if state.isMuted == true {
+                return "Volume not adjustable, muted"
+            }
+            return "Volume not adjustable"
+        }
+        guard state.isInUseElsewhere == false else {
+            return "Volume in use by another device"
+        }
+        if state.isMuted == true {
+            return "Volume \(Self.percent(state.volume)), muted"
+        }
+        return "Volume \(Self.percent(state.volume))"
     }
 }

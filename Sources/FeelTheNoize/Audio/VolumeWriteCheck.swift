@@ -19,46 +19,64 @@ struct VolumeWriteCheck {
     private var rejectedVolume: Float32?
 
     var isPending: Bool {
-        latestWrite != nil
+        return self.latestWrite != nil
     }
 
-    mutating func willWrite(_ volume: Float32, current: Float32) {
-        if baseline == nil {
-            baseline = current
+    mutating func willWrite(_ volume: Float32, current: Float32) -> Void {
+        if self.baseline == nil {
+            self.baseline = current
         }
-        latestWrite = volume
+        self.latestWrite = volume
     }
 
-    mutating func didRead(_ volume: Float32) {
-        guard let baseline, let latestWrite else {
-            // Without a pending write, a volume other than the one the device returns to means a change got through.
-            if isRejected, let rejectedVolume, !Self.isClose(volume, rejectedVolume) {
-                isRejected = false
-                self.rejectedVolume = nil
-            }
+    mutating func didRead(_ volume: Float32) -> Void {
+        guard let baseline = self.baseline else {
+            self.clearRejection(unlessDeviceReturnedTo: volume)
+            return
+        }
+        guard let latestWrite = self.latestWrite else {
+            self.clearRejection(unlessDeviceReturnedTo: volume)
             return
         }
         // The echo of the write itself can arrive first; only a return to the baseline counts.
-        if Self.isClose(volume, baseline), !Self.isClose(volume, latestWrite) {
-            didSnapBack = true
-            isRejected = true
-            rejectedVolume = baseline
+        if Self.isClose(volume, baseline) == true {
+            if Self.isClose(volume, latestWrite) == false {
+                self.didSnapBack = true
+                self.isRejected = true
+                self.rejectedVolume = baseline
+            }
         }
     }
 
     /// Ends the window: a write that stood for the whole window clears the rejection.
-    mutating func finish() {
-        guard isPending else { return }
-        if !didSnapBack {
-            isRejected = false
-            rejectedVolume = nil
+    mutating func finish() -> Void {
+        guard self.isPending == true else {
+            return
         }
-        baseline = nil
-        latestWrite = nil
-        didSnapBack = false
+        if self.didSnapBack == false {
+            self.isRejected = false
+            self.rejectedVolume = nil
+        }
+        self.baseline = nil
+        self.latestWrite = nil
+        self.didSnapBack = false
+    }
+
+    /// Without a pending write, a volume other than the one the device returns to means a change got through.
+    private mutating func clearRejection(unlessDeviceReturnedTo volume: Float32) -> Void {
+        guard self.isRejected == true else {
+            return
+        }
+        guard let rejectedVolume = self.rejectedVolume else {
+            return
+        }
+        if Self.isClose(volume, rejectedVolume) == false {
+            self.isRejected = false
+            self.rejectedVolume = nil
+        }
     }
 
     private static func isClose(_ a: Float32, _ b: Float32) -> Bool {
-        abs(a - b) < tolerance
+        return abs(a - b) < Self.tolerance
     }
 }

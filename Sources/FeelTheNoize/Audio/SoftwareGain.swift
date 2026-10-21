@@ -7,9 +7,13 @@ nonisolated enum SoftwareGain {
     static let range = 50.0
 
     static func amplitude(for level: Float) -> Float {
-        guard level > 0 else { return 0 }
-        guard level < 1 else { return 1 }
-        let decibels = -range * (1 - Double(level))
+        guard level > 0 else {
+            return 0
+        }
+        guard level < 1 else {
+            return 1
+        }
+        let decibels = -Self.range * (1 - Double(level))
         return Float(pow(10, decibels / 20))
     }
 }

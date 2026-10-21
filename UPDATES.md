@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.9, review 3.1: pure logic to the Swift skill)
+
+- `VolumeStepper`, `DialReport`, `VolumeWriteCheck`, `SoftwareGain`, `AccessoryBattery`, `AudioDeviceInfo`, `CoreAudioError`, `KnobIcon`, `DeviceIcon`, `BatteryIcon` and `VolumePresentation` rewritten to the swift-coding-conventions skill: explicit `self.` and `Self.`, `== true` / `== false` in conditions, explicit `return`, `-> Void`, one condition per `guard` or `if`, guards only before any other statement, one pattern per `case`, no nested ternary. No behavior change; the unit tests pin every one of these files. Reason: `Docs/CODE_REVIEW.md` §3, decided literal application.
+- `HapticWaveform` and `DialInputReport` moved out of `DialReport.swift` into their own files (one type per file), ahead of milestone 3.6, since the file was rewritten anyway.
+- version bump: 1.2.8 to 1.2.9 (PATCH - style refactoring)
+
 ### 2026-10-22 (v1.2.8, review 4.1 to 4.3: Core Audio seam and audio adapter tests)
 
 - `CoreAudioAccess` (protocol) with `CoreAudioHAL` (forwards to `CoreAudioProperty` and the listener block calls) is injected into `AudioOutput`, `AudioDeviceList` and `InputDeviceKeeper`; `AudioOutput` also takes `SoftwareVolumeControlling` (`SoftwareVolume` conforms), a `now` closure and a `sleep` closure. The defaults keep every call site unchanged. Reason: `Docs/CODE_REVIEW.md` §4.3; the audio adapters carry real logic that had no unit test because the HAL was a static hidden dependency.

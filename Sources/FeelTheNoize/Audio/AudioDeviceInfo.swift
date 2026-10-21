@@ -16,31 +16,55 @@ struct AudioDeviceInfo: Equatable {
 
         init(coreAudioTransportType: UInt32) {
             switch coreAudioTransportType {
-                case kAudioDeviceTransportTypeBuiltIn: self = .builtIn
-                case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: self = .bluetooth
-                case kAudioDeviceTransportTypeUSB: self = .usb
-                case kAudioDeviceTransportTypeHDMI: self = .hdmi
-                case kAudioDeviceTransportTypeDisplayPort: self = .displayPort
-                case kAudioDeviceTransportTypeAirPlay: self = .airPlay
-                case kAudioDeviceTransportTypeThunderbolt: self = .thunderbolt
-                case kAudioDeviceTransportTypeVirtual: self = .virtual
-                case kAudioDeviceTransportTypeAggregate, kAudioDeviceTransportTypeAutoAggregate: self = .aggregate
-                default: self = .other
+                case kAudioDeviceTransportTypeBuiltIn:
+                    self = .builtIn
+                case kAudioDeviceTransportTypeBluetooth:
+                    self = .bluetooth
+                case kAudioDeviceTransportTypeBluetoothLE:
+                    self = .bluetooth
+                case kAudioDeviceTransportTypeUSB:
+                    self = .usb
+                case kAudioDeviceTransportTypeHDMI:
+                    self = .hdmi
+                case kAudioDeviceTransportTypeDisplayPort:
+                    self = .displayPort
+                case kAudioDeviceTransportTypeAirPlay:
+                    self = .airPlay
+                case kAudioDeviceTransportTypeThunderbolt:
+                    self = .thunderbolt
+                case kAudioDeviceTransportTypeVirtual:
+                    self = .virtual
+                case kAudioDeviceTransportTypeAggregate:
+                    self = .aggregate
+                case kAudioDeviceTransportTypeAutoAggregate:
+                    self = .aggregate
+                default:
+                    self = .other
             }
         }
 
         var label: String {
             switch self {
-                case .builtIn: "Built-in"
-                case .bluetooth: "Bluetooth"
-                case .usb: "USB"
-                case .hdmi: "HDMI"
-                case .displayPort: "DisplayPort"
-                case .airPlay: "AirPlay"
-                case .thunderbolt: "Thunderbolt"
-                case .virtual: "Virtual"
-                case .aggregate: "Aggregate"
-                case .other: "Other"
+                case .builtIn:
+                    return "Built-in"
+                case .bluetooth:
+                    return "Bluetooth"
+                case .usb:
+                    return "USB"
+                case .hdmi:
+                    return "HDMI"
+                case .displayPort:
+                    return "DisplayPort"
+                case .airPlay:
+                    return "AirPlay"
+                case .thunderbolt:
+                    return "Thunderbolt"
+                case .virtual:
+                    return "Virtual"
+                case .aggregate:
+                    return "Aggregate"
+                case .other:
+                    return "Other"
             }
         }
     }

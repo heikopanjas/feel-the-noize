@@ -16,16 +16,23 @@ struct AccessoryBattery: Equatable {
 
         init?(identifier: String?) {
             switch identifier {
-                case "Left": self = .left
-                case "Right": self = .right
-                case "Case": self = .chargingCase
-                case "Single", nil: self = .single
-                default: return nil
+                case "Left":
+                    self = .left
+                case "Right":
+                    self = .right
+                case "Case":
+                    self = .chargingCase
+                case "Single":
+                    self = .single
+                case nil:
+                    self = .single
+                default:
+                    return nil
             }
         }
 
         static func < (lhs: Part, rhs: Part) -> Bool {
-            lhs.rawValue < rhs.rawValue
+            return lhs.rawValue < rhs.rawValue
         }
     }
 
@@ -55,20 +62,34 @@ struct AccessoryBattery: Equatable {
 
     /// The level of a single-cell device, which the menu shows with a battery symbol.
     var singleLevel: Int? {
-        cells.count == 1 && cells[0].part == .single ? cells[0].level : nil
+        guard self.cells.count == 1 else {
+            return nil
+        }
+        guard let cell = self.cells.first else {
+            return nil
+        }
+        guard cell.part == .single else {
+            return nil
+        }
+        return cell.level
     }
 
     /// "80 %" for a single cell, "L 80 %, R 75 %, case 40 %" for AirPods.
     var text: String {
-        cells.map { cell in
-            switch cell.part {
-                case .left: "L \(cell.level) %"
-                case .right: "R \(cell.level) %"
-                case .chargingCase: "case \(cell.level) %"
-                case .single: "\(cell.level) %"
-            }
+        return self.cells.map(Self.text(for:)).joined(separator: ", ")
+    }
+
+    private static func text(for cell: Cell) -> String {
+        switch cell.part {
+            case .left:
+                return "L \(cell.level) %"
+            case .right:
+                return "R \(cell.level) %"
+            case .chargingCase:
+                return "case \(cell.level) %"
+            case .single:
+                return "\(cell.level) %"
         }
-        .joined(separator: ", ")
     }
 
     // MARK: - Reading
@@ -80,19 +101,23 @@ struct AccessoryBattery: Equatable {
             return Readings()
         }
         let copy = unsafeBitCast(symbol, to: CopyPowerSourcesByType.self)
-        guard let blob = copy(accessoryType)?.takeRetainedValue() else { return Readings() }
+        guard let blob = copy(Self.accessoryType)?.takeRetainedValue() else {
+            return Readings()
+        }
         // The list is declared implicitly unwrapped; powerd returns none while it restarts, which must not crash the menu.
-        guard let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() else { return Readings() }
+        guard let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() else {
+            return Readings()
+        }
         let sources = list as [CFTypeRef]
         let descriptions = sources.compactMap { IOPSGetPowerSourceDescription(blob, $0)?.takeUnretainedValue() as? [String: Any] }
-        return Readings(devices: batteries(from: descriptions), dialLevel: dialLevel(from: descriptions))
+        return Readings(devices: Self.batteries(from: descriptions), dialLevel: Self.dialLevel(from: descriptions))
     }
 
     static func dialLevel(from descriptions: [[String: Any]]) -> Int? {
-        let dial = descriptions.first {
-            $0["Vendor ID"] as? Int == dialVendorID && $0["Product ID"] as? Int == dialProductID
+        let dial = descriptions.first { description in
+            return description["Vendor ID"] as? Int == Self.dialVendorID && description["Product ID"] as? Int == Self.dialProductID
         }
-        return (dial?["Current Capacity"] as? Int).map { min(max($0, 0), 100) }
+        return (dial?["Current Capacity"] as? Int).map(Self.clamped(level:))
     }
 
     /// Groups the parts of one device by `Group Identifier`, falling back to `Accessory Identifier`. Sources without a
@@ -100,20 +125,43 @@ struct AccessoryBattery: Equatable {
     static func batteries(from descriptions: [[String: Any]]) -> [String: AccessoryBattery] {
         var cells: [String: [Cell]] = [:]
         for description in descriptions {
-            let identifier = (description["Group Identifier"] ?? description["Accessory Identifier"]) as? String
-            guard let address = identifier.flatMap(Self.address(in:)),
-                let part = Part(identifier: description["Part Identifier"] as? String),
-                let level = description["Current Capacity"] as? Int
-            else { continue }
-            cells[address, default: []].append(Cell(part: part, level: min(max(level, 0), 100)))
+            guard let cell = Self.cell(from: description) else {
+                continue
+            }
+            cells[cell.address, default: []].append(cell.cell)
         }
-        return cells.mapValues { $0.sorted { $0.part < $1.part } }
-            .reduce(into: [:]) { result, entry in result[entry.key] = AccessoryBattery(address: entry.key, cells: entry.value) }
+        var batteries: [String: AccessoryBattery] = [:]
+        for (address, parts) in cells {
+            batteries[address] = AccessoryBattery(address: address, cells: parts.sorted { $0.part < $1.part })
+        }
+        return batteries
     }
 
     /// Finds a Bluetooth address such as `70-F9-4A-A8-CE-BF` in a Core Audio UID or `70:F9:4A:A8:CE:BF` in a power source.
     static func address(in text: String) -> String? {
-        guard let match = text.firstMatch(of: /([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2}/) else { return nil }
+        guard let match = text.firstMatch(of: /([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2}/) else {
+            return nil
+        }
         return String(match.output.0).filter(\.isHexDigit).uppercased()
+    }
+
+    private static func cell(from description: [String: Any]) -> (address: String, cell: Cell)? {
+        guard let identifier = (description["Group Identifier"] ?? description["Accessory Identifier"]) as? String else {
+            return nil
+        }
+        guard let address = Self.address(in: identifier) else {
+            return nil
+        }
+        guard let part = Part(identifier: description["Part Identifier"] as? String) else {
+            return nil
+        }
+        guard let level = description["Current Capacity"] as? Int else {
+            return nil
+        }
+        return (address: address, cell: Cell(part: part, level: Self.clamped(level: level)))
+    }
+
+    private static func clamped(level: Int) -> Int {
+        return min(max(level, 0), 100)
     }
 }

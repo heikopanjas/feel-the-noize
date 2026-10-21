@@ -14,9 +14,12 @@ nonisolated enum KnobIcon {
 
         var title: String {
             switch self {
-                case .arc: "Arc"
-                case .ring: "Ring"
-                case .dots: "Dots"
+                case .arc:
+                    return "Arc"
+                case .ring:
+                    return "Ring"
+                case .dots:
+                    return "Dots"
             }
         }
     }
@@ -29,12 +32,12 @@ nonisolated enum KnobIcon {
 
     /// Pointer angle in degrees, counter-clockwise from the positive x axis, for a level clamped to 0…1.
     static func pointerDegrees(for level: Float) -> CGFloat {
-        startDegrees - sweepDegrees * CGFloat(min(max(level, 0), 1))
+        return Self.startDegrees - Self.sweepDegrees * CGFloat(min(max(level, 0), 1))
     }
 
     static func image(style: Style, level: Float, isMuted: Bool, size: CGFloat, accessibilityDescription: String?) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            draw(style: style, level: level, isMuted: isMuted, in: rect)
+            Self.draw(style: style, level: level, isMuted: isMuted, in: rect)
             return true
         }
         image.isTemplate = true
@@ -45,53 +48,60 @@ nonisolated enum KnobIcon {
     // MARK: - Drawing
 
     /// All measures are in units of an 18-unit square, the menu bar size, and scaled to the rect.
-    private static func draw(style: Style, level: Float, isMuted: Bool, in rect: NSRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
+    private static func draw(style: Style, level: Float, isMuted: Bool, in rect: NSRect) -> Void {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
         let scale = rect.width / 18
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let pointer = pointerDegrees(for: level)
-        let lit = !isMuted && level > 0
+        let pointer = Self.pointerDegrees(for: level)
+        let lit = isMuted == false && level > 0
 
         // A transparency layer lets the knock-outs below cut only through the knob, not through the menu bar behind it.
         context.beginTransparencyLayer(auxiliaryInfo: nil)
         switch style {
             case .arc:
-                stroke(arcFrom: startDegrees, to: startDegrees - sweepDegrees, radius: 7.6, width: 1.5, alpha: unlitAlpha, center, scale)
-                if lit {
-                    stroke(arcFrom: startDegrees, to: pointer, radius: 7.6, width: 1.5, alpha: 1, center, scale)
+                Self.stroke(
+                    arcFrom: Self.startDegrees, to: Self.startDegrees - Self.sweepDegrees, radius: 7.6, width: 1.5, alpha: Self.unlitAlpha,
+                    center, scale)
+                if lit == true {
+                    Self.stroke(arcFrom: Self.startDegrees, to: pointer, radius: 7.6, width: 1.5, alpha: 1, center, scale)
                 }
-                drawDisc(radius: 4.8, pointer: pointer, isMuted: isMuted, center, scale, context)
+                Self.drawDisc(radius: 4.8, pointer: pointer, isMuted: isMuted, center, scale, context)
             case .ring:
-                let ring = NSBezierPath(ovalIn: square(center, radius: 7 * scale))
+                let ring = NSBezierPath(ovalIn: Self.square(center, radius: 7 * scale))
                 ring.lineWidth = 1.6 * scale
                 NSColor.black.setStroke()
                 ring.stroke()
-                if !isMuted {
-                    line(from: point(center, 1.5 * scale, pointer), to: point(center, 5.2 * scale, pointer), width: 2 * scale)
+                if isMuted == false {
+                    Self.line(from: Self.point(center, 1.5 * scale, pointer), to: Self.point(center, 5.2 * scale, pointer), width: 2 * scale)
                 }
             case .dots:
-                for index in 0 ..< dotCount {
-                    let fraction = Float(index) / Float(dotCount - 1)
-                    let isOn = lit && fraction <= level + 0.001
-                    NSColor.black.withAlphaComponent(isOn ? 1 : unlitAlpha).setFill()
-                    NSBezierPath(ovalIn: square(point(center, 7.6 * scale, pointerDegrees(for: fraction)), radius: 1 * scale)).fill()
+                for index in 0 ..< Self.dotCount {
+                    let fraction = Float(index) / Float(Self.dotCount - 1)
+                    let isOn = lit == true && fraction <= level + 0.001
+                    NSColor.black.withAlphaComponent(isOn == true ? 1 : Self.unlitAlpha).setFill()
+                    let dot = Self.point(center, 7.6 * scale, Self.pointerDegrees(for: fraction))
+                    NSBezierPath(ovalIn: Self.square(dot, radius: 1 * scale)).fill()
                 }
-                drawDisc(radius: 5, pointer: pointer, isMuted: isMuted, center, scale, context)
+                Self.drawDisc(radius: 5, pointer: pointer, isMuted: isMuted, center, scale, context)
         }
-        if isMuted {
+        if isMuted == true {
             // A slash with a knock-out gap on both sides, so it stays readable at 18 points.
             let from = CGPoint(x: center.x - 7.5 * scale, y: center.y + 7.5 * scale)
             let to = CGPoint(x: center.x + 7.5 * scale, y: center.y - 7.5 * scale)
-            knockOut(from: from, to: to, width: 3.6 * scale, context)
-            line(from: from, to: to, width: 1.6 * scale)
+            Self.knockOut(from: from, to: to, width: 3.6 * scale, context)
+            Self.line(from: from, to: to, width: 1.6 * scale)
         }
         context.endTransparencyLayer()
     }
 
     /// A filled knob with the pointer cut out of it; an outline only when muted.
-    private static func drawDisc(radius: CGFloat, pointer: CGFloat, isMuted: Bool, _ center: CGPoint, _ scale: CGFloat, _ context: CGContext) {
-        let disc = NSBezierPath(ovalIn: square(center, radius: radius * scale))
-        if isMuted {
+    private static func drawDisc(
+        radius: CGFloat, pointer: CGFloat, isMuted: Bool, _ center: CGPoint, _ scale: CGFloat, _ context: CGContext
+    ) -> Void {
+        let disc = NSBezierPath(ovalIn: Self.square(center, radius: radius * scale))
+        if isMuted == true {
             disc.lineWidth = 1.4 * scale
             NSColor.black.setStroke()
             disc.stroke()
@@ -99,13 +109,13 @@ nonisolated enum KnobIcon {
         else {
             NSColor.black.setFill()
             disc.fill()
-            knockOut(from: center, to: point(center, (radius - 1.1) * scale, pointer), width: 1.6 * scale, context)
+            Self.knockOut(from: center, to: Self.point(center, (radius - 1.1) * scale, pointer), width: 1.6 * scale, context)
         }
     }
 
     private static func stroke(
         arcFrom start: CGFloat, to end: CGFloat, radius: CGFloat, width: CGFloat, alpha: CGFloat, _ center: CGPoint, _ scale: CGFloat
-    ) {
+    ) -> Void {
         let arc = NSBezierPath()
         arc.appendArc(withCenter: center, radius: radius * scale, startAngle: start, endAngle: end, clockwise: true)
         arc.lineWidth = width * scale
@@ -114,7 +124,7 @@ nonisolated enum KnobIcon {
         arc.stroke()
     }
 
-    private static func line(from start: CGPoint, to end: CGPoint, width: CGFloat) {
+    private static func line(from start: CGPoint, to end: CGPoint, width: CGFloat) -> Void {
         let path = NSBezierPath()
         path.move(to: start)
         path.line(to: end)
@@ -124,10 +134,10 @@ nonisolated enum KnobIcon {
         path.stroke()
     }
 
-    private static func knockOut(from start: CGPoint, to end: CGPoint, width: CGFloat, _ context: CGContext) {
+    private static func knockOut(from start: CGPoint, to end: CGPoint, width: CGFloat, _ context: CGContext) -> Void {
         context.saveGState()
         context.setBlendMode(.clear)
-        line(from: start, to: end, width: width)
+        Self.line(from: start, to: end, width: width)
         context.restoreGState()
     }
 
@@ -137,6 +147,6 @@ nonisolated enum KnobIcon {
     }
 
     private static func square(_ center: CGPoint, radius: CGFloat) -> NSRect {
-        NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+        return NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
     }
 }
