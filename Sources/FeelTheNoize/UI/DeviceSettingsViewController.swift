@@ -1,6 +1,7 @@
 import AppKit
 
-/// The Devices settings tab (docs/DESIGN.md §7.6): every output device, what it supports, and whether the Dial may use it.
+/// The Devices settings tab (docs/DESIGN.md §7.6): every output device, what it supports, and whether the Dial may use it,
+/// and the input device to keep (§7.13).
 ///
 /// Connected devices come first, then remembered ones that are absent right now. The device list is observed only while
 /// the tab is visible.
@@ -45,11 +46,13 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     }
 
     private static let margin: CGFloat = 20
-    private static let contentSize = NSSize(width: 740, height: 350)
+    private static let contentSize = NSSize(width: 740, height: 430)
+    private static let offTitle = "Off"
 
     private let settings: Settings
     private let deviceList = AudioDeviceList()
     private let tableView = NSTableView()
+    private let keepPopup = NSPopUpButton()
     private var rows: [Row] = []
 
     init(settings: Settings) {
@@ -92,8 +95,21 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
         footnote.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         footnote.textColor = .secondaryLabelColor
 
+        let keepLabel = NSTextField(labelWithString: "Keep input device:")
+        keepPopup.target = self
+        keepPopup.action = #selector(keepInputChanged(_:))
+        keepPopup.setAccessibilityLabel("Keep input device")
+        let keepRow = NSStackView(views: [keepLabel, keepPopup])
+        keepRow.spacing = 8
+        let keepFootnote = NSTextField(
+            wrappingLabelWithString:
+                "While this device is connected, Feel the Noize switches the input back to it whenever another device takes over. "
+                + "Choosing an input in the menu moves the keep to that device.")
+        keepFootnote.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        keepFootnote.textColor = .secondaryLabelColor
+
         let container = NSView()
-        for subview in [scrollView, footnote] {
+        for subview in [scrollView, footnote, keepRow, keepFootnote] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(subview)
         }
@@ -106,7 +122,12 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
             footnote.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
             footnote.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             footnote.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            footnote.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.margin)
+            keepRow.topAnchor.constraint(equalTo: footnote.bottomAnchor, constant: 20),
+            keepRow.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            keepFootnote.topAnchor.constraint(equalTo: keepRow.bottomAnchor, constant: 8),
+            keepFootnote.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            keepFootnote.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            keepFootnote.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.margin)
         ])
         view = container
         preferredContentSize = Self.contentSize
@@ -142,6 +163,42 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
         }
         rows = Self.sortedByName(connectedRows) + Self.sortedByName(rememberedRows)
         tableView.reloadData()
+
+        let inputs = deviceList.devices.filter(\.hasInput)
+        settings.rememberInputDevices(Dictionary(inputs.map { ($0.uid, $0.name) }, uniquingKeysWith: { first, _ in first }))
+        rebuildKeepPopup(inputs: inputs)
+    }
+
+    // MARK: - Kept Input
+
+    private func rebuildKeepPopup(inputs: [AudioDeviceInfo]) {
+        let keptUID = settings.keptInputDeviceUID
+        keepPopup.removeAllItems()
+        let off = NSMenuItem(title: Self.offTitle, action: nil, keyEquivalent: "")
+        keepPopup.menu?.addItem(off)
+        let choices = Self.keepChoices(inputs: inputs, keptUID: keptUID, knownNames: settings.knownInputDevices)
+        if !choices.isEmpty {
+            keepPopup.menu?.addItem(.separator())
+        }
+        for choice in choices {
+            let item = NSMenuItem(title: choice.title, action: nil, keyEquivalent: "")
+            item.representedObject = choice.uid
+            keepPopup.menu?.addItem(item)
+            if choice.uid == keptUID {
+                keepPopup.select(item)
+            }
+        }
+        if keptUID == nil {
+            keepPopup.select(off)
+        }
+    }
+
+    /// Connected inputs sorted by name, then the kept device marked as not connected while it is absent, so the popup can
+    /// still show it.
+    static func keepChoices(inputs: [AudioDeviceInfo], keptUID: String?, knownNames: [String: String]) -> [(uid: String, title: String)] {
+        let connected = inputs.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }.map { (uid: $0.uid, title: $0.name) }
+        guard let keptUID, !connected.contains(where: { $0.uid == keptUID }) else { return connected }
+        return connected + [(uid: keptUID, title: "\(knownNames[keptUID] ?? keptUID) (not connected)")]
     }
 
     private static func sortedByName(_ rows: [Row]) -> [Row] {
@@ -257,6 +314,10 @@ final class DeviceSettingsViewController: NSViewController, NSTableViewDataSourc
     @objc private func toggleDevice(_ sender: NSButton) {
         guard rows.indices.contains(sender.tag) else { return }
         settings.setDevice(rows[sender.tag].uid, enabled: sender.state == .on)
+    }
+
+    @objc private func keepInputChanged(_ sender: NSPopUpButton) {
+        settings.keptInputDeviceUID = sender.selectedItem?.representedObject as? String
     }
 
     @objc private func toggleSoftwareVolume(_ sender: NSButton) {

@@ -6,18 +6,21 @@ struct StatusItemTitleTests {
     @Test(
         "Dial status line",
         arguments: [
-            (DialConnection.connected, Int?.some(85), "Surface Dial: Connected, battery 85 %"),
-            (.connected, nil, "Surface Dial: Connected"),
-            (.notConnected, 85, "Surface Dial: Not Connected"),
-            (.inUseElsewhere, 85, "Surface Dial: In Use by Another App")
-        ] as [(DialConnection, Int?, String)])
-    func dialTitle(connection: DialConnection, battery: Int?, expected: String) {
-        #expect(StatusItemController.title(for: connection, batteryLevel: battery) == expected)
+            (DialConnection.connected, "Surface Dial: Connected"),
+            (.notConnected, "Surface Dial: Not Connected"),
+            (.inUseElsewhere, "Surface Dial: In Use by Another App")
+        ] as [(DialConnection, String)])
+    func dialTitle(connection: DialConnection, expected: String) {
+        #expect(StatusItemController.title(for: connection) == expected)
     }
 
-    @Test("Input line", arguments: [(String?.some("MOTU M2"), "Input: MOTU M2"), (nil, "Input: None")] as [(String?, String)])
-    func inputTitle(name: String?, expected: String) {
-        #expect(StatusItemController.inputTitle(name) == expected)
+    @Test(
+        "Input line",
+        arguments: [
+            (String?.some("MOTU M2"), false, "Input: MOTU M2"), ("MOTU M2", true, "Input: MOTU M2 (kept)"), (nil, false, "Input: None")
+        ] as [(String?, Bool, String)])
+    func inputTitle(name: String?, isKept: Bool, expected: String) {
+        #expect(StatusItemController.inputTitle(name, isKept: isKept) == expected)
     }
 
     @Test("Device sections split by direction and sort by name")

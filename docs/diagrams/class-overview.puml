@@ -110,6 +110,9 @@ package "Audio" {
         + {static} readVolume / writeVolume
         + {static} readMute / writeMute
     }
+    class InputDeviceKeeper {
+        + keptUID : String?
+    }
     class SoftwareVolume {
         + deviceUID : String?
         + level : Float
@@ -237,6 +240,8 @@ GeneralSettingsViewController ..> Settings : edits
 GeneralSettingsViewController ..> LoginItem : toggles
 DeviceSettingsViewController *-- AudioDeviceList
 StatusItemController *-- AudioDeviceList
+AppDelegate *-- InputDeviceKeeper
+InputDeviceKeeper ..> CoreAudioProperty : uses
 StatusItemController ..> DeviceIcon : draws
 DeviceSettingsViewController ..> Settings : selects devices
 AudioDeviceList ..> AudioDeviceInfo : lists

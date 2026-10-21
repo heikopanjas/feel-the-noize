@@ -16,16 +16,24 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// Called with the UID of the device the user picked in the menu.
     var onSelectOutput: ((String) -> Void)?
     var onSelectInput: ((String) -> Void)?
+    /// The input device Feel the Noize keeps (§7.13); the Input line marks it.
+    var keptInputUID: String? {
+        didSet { updateInputRow() }
+    }
     var iconStyle = KnobIcon.Style.arc {
         didSet { update(audio: audio, dial: dial, isOutputEnabled: isOutputEnabled) }
     }
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    private let dialItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let dialItem = NSMenuItem()
     private let accessItem = NSMenuItem(title: "Allow Input Monitoring…", action: #selector(openInputMonitoringSettings(_:)), keyEquivalent: "")
-    private let outputItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let inputItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let volumeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let outputItem = NSMenuItem()
+    private let inputItem = NSMenuItem()
+    private let volumeItem = NSMenuItem()
+    private let dialRow = MenuInfoRow()
+    private let outputRow = MenuInfoRow()
+    private let inputRow = MenuInfoRow()
+    private let volumeRow = MenuInfoRow()
     private let muteItem = NSMenuItem(title: "Mute", action: #selector(toggleMute(_:)), keyEquivalent: "")
     private let volumeSlider = VolumeSlider()
     /// The device sections are inserted right after the slider.
@@ -36,19 +44,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var dial = DialConnection.notConnected
     private var isOutputEnabled = true
     private var dialBatteryLevel: Int?
-    /// The status lines at the top are information, not commands, so they use a smaller font than the menu items.
     private static let iconSize: CGFloat = 18
     /// Slider row measured on the macOS Sound menu: a bold heading above the slider, both lined up with the section
     /// headers. AppKit widens the row to the menu.
     private static let sliderRowWidth: CGFloat = 240
-    private static let sliderInset: CGFloat = 14
+    private static let sliderInset = MenuInfoRow.inset
     private static let sliderBottomPadding: CGFloat = 8
     private static let headingSpacing: CGFloat = 6
     private static let headingTopPadding: CGFloat = 2
-    private static let infoAttributes: [NSAttributedString.Key: Any] = [
-        .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
-        .foregroundColor: NSColor.secondaryLabelColor
-    ]
     /// The default device of a section is also bold, in addition to the accent circle of its icon.
     private static let defaultDeviceAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.boldSystemFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize)
@@ -90,7 +93,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// `nil` while the level is unknown, for example right after the Dial connected.
     func setDialBatteryLevel(_ level: Int?) {
         dialBatteryLevel = level
-        Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: level))
+        updateDialRow()
     }
 
     func setAccessDenied(_ isDenied: Bool) {
@@ -105,10 +108,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
 
-        for infoItem in [dialItem, outputItem, inputItem, volumeItem] {
-            infoItem.isEnabled = false
+        for (item, row) in [(dialItem, dialRow), (outputItem, outputRow), (inputItem, inputRow), (volumeItem, volumeRow)] {
+            item.view = row
+            item.isEnabled = false
         }
-        Self.setInfoTitle(inputItem, Self.inputTitle(nil))
+        inputRow.text = Self.inputTitle(nil, isKept: false)
         accessItem.target = self
         accessItem.isHidden = true
         muteItem.target = self
@@ -165,20 +169,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     private func updateMenuItems() {
-        Self.setInfoTitle(dialItem, Self.title(for: dial, batteryLevel: dialBatteryLevel))
+        updateDialRow()
         let suffix = audio != nil && !isOutputEnabled ? " (Dial off)" : ""
-        Self.setInfoTitle(outputItem, "Output: \(audio?.deviceName ?? "None")\(suffix)")
+        outputRow.text = "Output: \(audio?.deviceName ?? "None")\(suffix)"
 
         switch audio {
             case .none:
-                Self.setInfoTitle(volumeItem, "Volume: –")
+                volumeRow.text = "Volume: –"
             case .some(let state) where !state.canSetVolume:
-                Self.setInfoTitle(volumeItem, "Volume: not adjustable")
+                volumeRow.text = "Volume: not adjustable"
             case .some(let state) where state.isInUseElsewhere:
-                Self.setInfoTitle(volumeItem, "Volume: in use by another device")
+                volumeRow.text = "Volume: in use by another device"
             case .some(let state):
                 let suffix = state.isSoftwareVolume ? " (software)" : ""
-                Self.setInfoTitle(volumeItem, "Volume: \(VolumePresentation.percent(state.volume))\(suffix)")
+                volumeRow.text = "Volume: \(VolumePresentation.percent(state.volume))\(suffix)"
         }
 
         // Like the system Sound menu, the slider stands at zero while muted; a device without volume control shows its fixed
@@ -194,8 +198,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     // MARK: - Devices
 
     private func deviceListChanged() {
-        let defaultInput = deviceList.devices.first { $0.hasInput && $0.uid == deviceList.defaultInputUID }
-        Self.setInfoTitle(inputItem, Self.inputTitle(defaultInput?.name))
+        updateInputRow()
         updateSliderSymbol()
 
         guard let menu = statusItem.menu else { return }
@@ -210,6 +213,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         for (offset, item) in deviceItems.enumerated() {
             menu.insertItem(item, at: start + offset)
         }
+    }
+
+    private func updateInputRow() {
+        let defaultInput = deviceList.devices.first { $0.hasInput && $0.uid == deviceList.defaultInputUID }
+        inputRow.text = Self.inputTitle(defaultInput?.name, isKept: defaultInput != nil && defaultInput?.uid == keptInputUID)
     }
 
     /// The device list knows the transport and model the symbol depends on; it runs while the menu is open, the only time
@@ -250,24 +258,24 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return (sorted.filter(\.hasOutput), sorted.filter(\.hasInput))
     }
 
-    static func inputTitle(_ deviceName: String?) -> String {
-        "Input: \(deviceName ?? "None")"
+    static func inputTitle(_ deviceName: String?, isKept: Bool) -> String {
+        "Input: \(deviceName ?? "None")\(isKept ? " (kept)" : "")"
     }
 
     // MARK: - Titles
 
-    static func title(for dial: DialConnection, batteryLevel: Int?) -> String {
-        switch (dial, batteryLevel) {
-            case (.connected, .some(let level)): "Surface Dial: Connected, battery \(level) %"
-            case (.connected, .none): "Surface Dial: Connected"
-            case (.notConnected, _): "Surface Dial: Not Connected"
-            case (.inUseElsewhere, _): "Surface Dial: In Use by Another App"
-        }
+    /// The battery level shows only while the Dial is connected; it is kept while disconnected for the next connection.
+    private func updateDialRow() {
+        dialRow.text = Self.title(for: dial)
+        dialRow.batteryLevel = dial == .connected ? dialBatteryLevel : nil
     }
 
-    /// Always through the attributed title: setting `title` alone would leave a stale attributed title on screen.
-    private static func setInfoTitle(_ item: NSMenuItem, _ text: String) {
-        item.attributedTitle = NSAttributedString(string: text, attributes: infoAttributes)
+    static func title(for dial: DialConnection) -> String {
+        switch dial {
+            case .connected: "Surface Dial: Connected"
+            case .notConnected: "Surface Dial: Not Connected"
+            case .inUseElsewhere: "Surface Dial: In Use by Another App"
+        }
     }
 
     // MARK: - Actions

@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let battery = DialBattery()
     private let keepAwake: DialKeepAwake
     private let userActivity = UserActivity()
+    private let inputKeeper = InputDeviceKeeper()
     private var statusItem: StatusItemController?
     private var settingsWindow: SettingsWindowController?
     private var isAccessDenied = false
@@ -50,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeOutput)
         }
         statusItem.onSelectInput = { [weak self] uid in
-            self?.selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeInput)
+            self?.selectInputFromMenu(uid)
         }
         self.statusItem = statusItem
 
@@ -60,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.applyIconStyle()
             self?.applyDialConfiguration()
             self?.applyKeepAwake()
+            self?.applyKeptInput()
             self?.audio.refreshSoftwareVolume()
             // Excluding or including the current output changes the icon.
             self?.refreshStatusItem()
@@ -67,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Stored before start(), so the first match already gets the user's configuration.
         applyDialConfiguration()
         applyKeepAwake()
+        applyKeptInput()
 
         dial.onEvent = { [weak self] event in
             Log.control.debug("Dial event: \(String(describing: event), privacy: .public)")
@@ -159,6 +162,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.setVolume(volume)
     }
 
+    /// While a device is kept, the menu choice becomes the new kept device (docs/DESIGN.md §7.13). The keep moves before the
+    /// switch, so the keeper does not revert it.
+    private func selectInputFromMenu(_ uid: String) {
+        if settings.keptInputDeviceUID != nil {
+            if let deviceID = try? CoreAudioProperty.readDevice(uid: uid),
+                let name = try? CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID)
+            {
+                settings.rememberInputDevices([uid: name])
+            }
+            settings.keptInputDeviceUID = uid
+        }
+        selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeInput)
+    }
+
     /// `AudioOutput` and the open menu follow the new default through their own listeners (docs/DESIGN.md §7.11).
     private func selectDefaultDevice(_ uid: String, scope: AudioObjectPropertyScope) {
         let direction = scope == kAudioDevicePropertyScopeInput ? "input" : "output"
@@ -205,6 +222,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyKeepAwake() {
         keepAwake.isEnabled = settings.keepDialAwake
+    }
+
+    private func applyKeptInput() {
+        inputKeeper.keptUID = settings.keptInputDeviceUID
+        statusItem?.keptInputUID = settings.keptInputDeviceUID
     }
 
     private func showSettings() {

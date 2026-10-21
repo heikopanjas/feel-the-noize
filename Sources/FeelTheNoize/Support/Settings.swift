@@ -25,6 +25,8 @@ final class Settings {
         static let knownOutputDevices = "knownOutputDevices"
         static let softwareVolumeDevices = "softwareVolumeDevices"
         static let softwareVolumeLevels = "softwareVolumeLevels"
+        static let keptInputDevice = "keptInputDevice"
+        static let knownInputDevices = "knownInputDevices"
     }
 
     private static let defaultDetents = 36
@@ -140,10 +142,35 @@ final class Settings {
 
     /// Writes, and so calls `onChange`, only when a device or name is new.
     func rememberDevices(_ names: [String: String]) {
-        let known = knownDevices
+        remember(names, known: knownDevices, forKey: Key.knownOutputDevices)
+    }
+
+    // MARK: - Input Devices
+
+    /// The input device kept as default while it is connected (docs/DESIGN.md §7.13); `nil` when the keep is off. Stored as
+    /// an empty string for off.
+    var keptInputDeviceUID: String? {
+        get { defaults.string(forKey: Key.keptInputDevice).flatMap { $0.isEmpty ? nil : $0 } }
+        set {
+            guard newValue != keptInputDeviceUID else { return }
+            write(newValue ?? "", forKey: Key.keptInputDevice)
+        }
+    }
+
+    /// Names of every input device seen so far, by UID, so a kept device can be named while it is disconnected.
+    var knownInputDevices: [String: String] {
+        defaults.dictionary(forKey: Key.knownInputDevices) as? [String: String] ?? [:]
+    }
+
+    /// Writes, and so calls `onChange`, only when a device or name is new.
+    func rememberInputDevices(_ names: [String: String]) {
+        remember(names, known: knownInputDevices, forKey: Key.knownInputDevices)
+    }
+
+    private func remember(_ names: [String: String], known: [String: String], forKey key: String) {
         let merged = known.merging(names) { _, new in new }
         guard merged != known else { return }
-        write(merged, forKey: Key.knownOutputDevices)
+        write(merged, forKey: key)
     }
 
     private func write(_ value: Any, forKey key: String) {

@@ -135,4 +135,32 @@ struct SettingsTests {
             #expect(changes == 2)
         }
     }
+
+    @Test func keptInputIsOffByDefaultAndRoundTrips() {
+        withSettings { settings, defaults in
+            var changes = 0
+            settings.onChange = { changes += 1 }
+            #expect(settings.keptInputDeviceUID == nil)
+            settings.keptInputDeviceUID = "m2"
+            #expect(settings.keptInputDeviceUID == "m2")
+            settings.keptInputDeviceUID = "m2"
+            #expect(changes == 1)
+            settings.keptInputDeviceUID = nil
+            #expect(settings.keptInputDeviceUID == nil)
+            #expect(defaults.string(forKey: "keptInputDevice") == "")
+            #expect(changes == 2)
+        }
+    }
+
+    @Test func rememberInputDevicesIsSeparateFromOutputs() {
+        withSettings { settings, _ in
+            var changes = 0
+            settings.onChange = { changes += 1 }
+            settings.rememberInputDevices(["m2": "M2"])
+            settings.rememberInputDevices(["m2": "M2"])
+            #expect(settings.knownInputDevices == ["m2": "M2"])
+            #expect(settings.knownDevices.isEmpty)
+            #expect(changes == 1)
+        }
+    }
 }
