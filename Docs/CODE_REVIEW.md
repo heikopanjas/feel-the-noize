@@ -18,6 +18,19 @@ What the review found falls into three groups, in decreasing order of importance
 
 The fix plan (§5) orders the work so that behavior-affecting fixes land first in small, individually verifiable commits, the testability seam for `AudioOutput` comes next so the audio layer has unit tests before it is rewritten, and the mechanical convention sweep follows file by file with the formatter and tests as the safety net.
 
+### Status (2026-10-22)
+
+All milestones are implemented on branch `claude/kind-faraday-f47iwf`, one commit per milestone (`git log 0351e66..`), in the order 1 → 2 → 4 → 3. The version went from 1.2.0 to 1.2.16, one PATCH per code commit, and every milestone has an entry in UPDATES.md.
+
+**Nothing in this branch has been compiled, linted or run.** The container that executed the plan has no Swift toolchain. Before merging, on a Mac:
+
+1. `./build.sh lint test` — the first run will surface any compile error or lint finding from the sweep; the convention rewrites in Phase 3 were done by hand on ~5 500 lines without a compiler, so expect a handful of small fixes (a missed `self.`, a label, an isolation diagnostic on a closure).
+2. Watch the new suites in particular: `AudioOutputTests`, `AudioDeviceListTests`, `InputDeviceKeeperTests`, `DelayedActionTests` and `DialKeepAwakeTests` rely on `ManualSleeper`'s continuation choreography (`Fixtures/ManualSleeper.swift`); if one hangs, the `.timeLimit` to add is `.minutes(1)` and the suspect is `releaseAndWait()`.
+3. `./build.sh icon && git status` — the icon script must reproduce byte-identical PNGs (milestone 3.8 changed only error handling).
+4. The manual checklist items named per milestone in §5, above all 2–5 (haptics through `DelayedAction`), 7 and 21 (rejected writes through the pure `readState`), 9 and 18 (keep-awake) and 14–17 (menu and kept input).
+
+Known deviations from the plan, all recorded in UPDATES.md: the keep-awake timer and `DelayedAction` take a `(Duration) async -> Void` sleep closure rather than `any Clock<Duration>` (a lock-free manual clock would need a `Mutex` or an isolated `Clock` conformance); the file splits of C9 landed with 3.1–3.3 instead of 3.6; `AudioOutput`, `AudioDeviceList` and `InputDeviceKeeper` were rewritten to the skill in 4.1 because the seam rewrote them anyway; four places keep a type name where the skill asks for `Self.` because `Self` is unavailable there (static stored property initializers in `Log`, `VolumeSlider.Cell`, `DeviceIconTests`, `KeepChoicesTests`, and the pre-`self.init` closure in `UserActivity`), each with a comment.
+
 ### Decisions (2026-10-22, developer)
 
 Settled so later sessions can execute the plan without asking:
