@@ -4,6 +4,15 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, swift-build-commands reinstated)
+
+- The slopctl line telling agents to load the `swift-build-commands` skill is back in AGENTS.md, word for word, and the note that its commands do not apply is gone. The project Build Commands section stays beside it for the `build.sh` usage. Reason: requested by the developer; the skill works in the other XcodeGen projects (voltaic, zack, dashboard-of-doom), which keep the same line.
+
+### 2026-10-22 (v1.2.0, AGENTS.md cleanup)
+
+- AGENTS.md no longer repeats what the slopctl skills and `.swift-format` already cover: the formatting, force unwrap, access level, import order and comment rules are gone from the coding conventions, and the remaining rules became Project-Specific Rules (concurrency, logging, `dlsym`, debug spikes). The diagram style moved to the Documentation list. Reason: requested by the developer, since the `swift-coding-conventions` skill is loaded for every Swift change.
+- The build section shrank to the `build.sh` usage, the `xcodegen` and `xcrun swift-format` notes and the `log stream` command; the raw xcodebuild, swift-format and plantuml calls are gone, since `build.sh` wraps them.
+
 ### 2026-10-22 (v1.2.0, single build folder)
 
 - Release zips moved from `build/dist` to `.build/dist`, so `.build` is the only build folder; `./build.sh clean` removes only `.build`, the `build/` entry left `.gitignore`, and README and DESIGN.md §9.1 name the new path. The existing zips were moved over. Reason: requested by the developer; `build/` held nothing but the zips.

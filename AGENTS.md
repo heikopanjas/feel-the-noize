@@ -113,7 +113,7 @@ Architecture and behavior changes go into `Docs/DESIGN.md` as well.
 
 - Specification: `Docs/DESIGN.md` is the source of truth; architecture and behavior changes go there
 - Code comments: explain why, not what; `///` for documentation comments, `// MARK: -` to group sections
-- Diagrams: PlantUML in `Docs/diagrams/`, rendered to SVG and embedded in `Docs/DESIGN.md`
+- Diagrams: PlantUML in `Docs/diagrams/`, styled with the shared `visio2003.iuml` include, rendered to SVG and embedded in `Docs/DESIGN.md`
 - README: written for users
 - Changelog: maintained in `UPDATES.md` (see the `recent-updates` skill)
 
@@ -124,45 +124,26 @@ Architecture and behavior changes go into `Docs/DESIGN.md` as well.
 Load the `swift-coding-conventions` skill before writing, reviewing, or refactoring Swift code.
 Load the `swift-build-commands` skill when building or running the project.
 
-This is an XcodeGen project, not a Swift package: use the commands below instead of the SwiftPM commands in `swift-build-commands`. Where the project conventions below and the `swift-coding-conventions` skill disagree, the skill wins.
-
 ### Build Commands
 
-`build.sh` wraps the commands below; prefer `./build.sh build`, `test`, `lint`, `format`, `diagrams`, `icon`, `release` and `notarize`. Several commands run in order (`./build.sh lint test`); `./build.sh help` lists them. `TEAM_ID`, `DEVELOPER_ID` and `NOTARY_PROFILE` are overridden through the environment.
+`build.sh` is the entry point; prefer `./build.sh build`, `test`, `lint`, `format`, `diagrams`, `icon`, `release` and `notarize`. Several commands run in order (`./build.sh lint test`); `./build.sh help` lists them. `TEAM_ID`, `DEVELOPER_ID` and `NOTARY_PROFILE` are overridden through the environment.
+
+- `build` and `test` run `xcodegen generate` first; run `./build.sh gen` after changing `project.yml` or adding or removing files when not building.
+- swift-format ships with the Xcode toolchain and runs through `xcrun`.
+- Watch the app log, including raw HID reports:
 
 ```sh
-# Generate the Xcode project (after every change to project.yml or added/removed files)
-xcodegen generate
-
-# Build (debug)
-xcodebuild -scheme FeelTheNoize -configuration Debug build | xcbeautify
-
-# Test
-xcodebuild -scheme FeelTheNoize test | xcbeautify
-
-# Format and lint (swift-format ships with the Xcode toolchain)
-xcrun swift-format format --in-place --recursive Sources Tests
-xcrun swift-format lint --recursive Sources Tests
-
-# Watch the app log, including raw HID reports
 log stream --style compact --level debug --predicate 'subsystem == "com.panjas.FeelTheNoize"'
-
-# Render diagrams
-plantuml -tsvg Docs/diagrams/*.puml
 ```
 
-### Coding Conventions
+### Project-Specific Rules
 
-- Formatting is defined by `.swift-format` (4 spaces, 147 columns) and `.editorconfig`.
-- No force unwrapping, no force `try`, no implicitly unwrapped optionals.
-- `private` by default; widen access only when needed.
-- Imports ordered alphabetically.
-- Comments explain why, not what. `///` for documentation comments, `// MARK: -` to group sections.
+Architecture rules of this app that supplement the `swift-coding-conventions` skill; the skill wins where they disagree.
+
 - Concurrency: everything is main-actor isolated. IOKit and Core Audio callbacks run on the main run loop / main queue and enter the actor with `MainActor.assumeIsolated`. No `@unchecked Sendable`, no locks. The single exception to main-actor isolation is the software volume IO block (`SoftwareVolume`), which runs on the HAL IO thread and shares only the gain through `Synchronization.Atomic` in a `nonisolated final class`; it must not allocate, lock or log. C callbacks resolve the main-actor owner from the context pointer before entering the actor; a non-Sendable CF argument such as `IOHIDDevice` is handed over through a commented `nonisolated(unsafe) let`, the only permitted unsafe opt-out.
 - Logging via `os.Logger(subsystem: "com.panjas.FeelTheNoize", category:)` with categories `dial`, `audio`, `control`, `ui`, defined in `Support/Log.swift`. A category is added with the milestone that first uses it.
 - Undeclared system APIs are allowed only where their failure degrades a non-essential feature, looked up with `dlsym` and recorded in `Docs/DESIGN.md`. Currently only `IOPSCopyPowerSourcesByType` for the battery levels of the Dial and audio accessories (`AccessoryBattery`).
 - Milestone spike code that must not ship is wrapped in `#if DEBUG` and named in `Docs/DESIGN.md` §13 together with the milestone that removes it.
-- Diagrams are PlantUML in `Docs/diagrams/`, styled with the shared `visio2003.iuml` include.
 
 <!-- {integration} -->
 
