@@ -1,6 +1,6 @@
 import AppKit
 
-/// Non-resizable settings window with General and Devices tabs, centered on first show (docs/DESIGN.md §7.6).
+/// Non-resizable settings window with General and Devices tabs, centered on first show (Docs/DESIGN.md §7.6).
 final class SettingsWindowController: NSWindowController {
     private var hasBeenShown = false
 

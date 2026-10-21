@@ -1,6 +1,6 @@
 import AppKit
 
-/// One status line at the top of the menu (docs/DESIGN.md §5.3), with an optional battery level at the right edge.
+/// One status line at the top of the menu (Docs/DESIGN.md §5.3), with an optional battery level at the right edge.
 ///
 /// A custom item view, because a menu item title cannot align anything with the right edge of the menu. All status lines use
 /// it, so they share the left inset of the volume heading and slider. AppKit widens the row to the menu.

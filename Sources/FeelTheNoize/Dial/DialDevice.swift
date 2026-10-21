@@ -1,7 +1,7 @@
 import AppKit
 import IOKit.hid
 
-/// Owns the IOKit HID session for the Surface Dial: discovery, input reports, haptics and recovery (docs/DESIGN.md §7.2).
+/// Owns the IOKit HID session for the Surface Dial: discovery, input reports, haptics and recovery (Docs/DESIGN.md §7.2).
 ///
 /// The manager is scheduled on the main run loop, so every IOKit callback arrives on the main thread.
 final class DialDevice: HapticFeedback {
@@ -26,7 +26,7 @@ final class DialDevice: HapticFeedback {
     // The Dial powers down when idle and may come back with its default configuration.
     private static let idleReconfigurationThreshold: Duration = .seconds(15)
     private static let rebuildDelay: Duration = .seconds(1)
-    // The Dial's buzz waveform is continuous and never ends on its own (docs/DESIGN.md §7.1), so the end stop is cut
+    // The Dial's buzz waveform is continuous and never ends on its own (Docs/DESIGN.md §7.1), so the end stop is cut
     // to a short pulse with an explicit Stop trigger.
     private static let endStopBuzzDuration: Duration = .milliseconds(100)
 
@@ -119,7 +119,7 @@ final class DialDevice: HapticFeedback {
 
     // MARK: - Keep Awake
 
-    /// Sends the three reports that together kept the Dial awake in the spike of 2026-10-18 (docs/DESIGN.md §7.14). Which
+    /// Sends the three reports that together kept the Dial awake in the spike of 2026-10-18 (Docs/DESIGN.md §7.14). Which
     /// of them the Dial counts as activity is not known, so all three are sent; each is harmless on its own. Calls while
     /// disconnected are ignored.
     func sendKeepAlive() {

@@ -1,4 +1,4 @@
-/// Waveform ordinals from the Dial's haptic waveform list (docs/DESIGN.md §7.1).
+/// Waveform ordinals from the Dial's haptic waveform list (Docs/DESIGN.md §7.1).
 /// Ordinals 1 and 2 are the HID-defined None and Stop; 3 maps to Click (0x1003), 4 to Buzz Continuous (0x1004).
 enum HapticWaveform: UInt8 {
     case stop = 2
@@ -12,7 +12,7 @@ struct DialInputReport: Equatable {
     let delta: Int16
 }
 
-/// Pure encoder and decoder for the Surface Dial report layouts in docs/DESIGN.md §7.1.
+/// Pure encoder and decoder for the Surface Dial report layouts in Docs/DESIGN.md §7.1.
 /// All multi-byte fields are little-endian.
 enum DialReport {
     static let vendorID = 0x045E

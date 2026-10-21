@@ -1,6 +1,6 @@
 import CoreAudio
 
-/// An audio device as listed in the Devices settings tab and the status menu (docs/DESIGN.md §7.6, §7.11).
+/// An audio device as listed in the Devices settings tab and the status menu (Docs/DESIGN.md §7.6, §7.11).
 struct AudioDeviceInfo: Equatable {
     enum Transport: Equatable {
         case builtIn

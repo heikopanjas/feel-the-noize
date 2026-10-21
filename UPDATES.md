@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, capitalized docs and scripts folders)
+
+- `docs` renamed to `Docs` and `scripts` to `Scripts`, requested by the developer. References in build.sh, README, AGENTS.md, DESIGN.md, the icon script and the source comments now use the new names; older log entries keep the old paths, since the log is append-only.
+- The rename went through a temporary name with `git mv` (`docs` to `docs-rename-tmp` to `Docs`). Reason: the macOS file system is case-insensitive and git runs with `core.ignorecase`, so a direct case-only rename is unreliable; the two-step move records a clean rename in git history.
+
 ### 2026-10-22 (v1.2.0, slopctl migration)
 
 - Agent instructions migrated to slopctl with `slopctl init --lang swift --agent claude`: AGENTS.md regenerated from the slopctl templates, CLAUDE.md is the slopctl stub, `/init-session` comes from the template, and the skills git-workflow, semantic-versioning, recent-updates, swift-coding-conventions, swift-build-commands, swift-concurrency-pro and swift-testing-pro are installed in `.claude/skills/`. Reason: requested by the developer, so the instruction files are maintained from the shared template catalog.

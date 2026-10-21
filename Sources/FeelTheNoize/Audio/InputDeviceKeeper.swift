@@ -1,6 +1,6 @@
 import CoreAudio
 
-/// Keeps one input device as the default input while it is connected (docs/DESIGN.md §7.13).
+/// Keeps one input device as the default input while it is connected (Docs/DESIGN.md §7.13).
 ///
 /// Every change of the default input is reverted, whoever made it; the user moves the keep through the menu instead.
 /// Listeners are registered only while a device is kept, so a keep that is off adds no work.

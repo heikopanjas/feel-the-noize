@@ -2,7 +2,7 @@ import CoreAudio
 import Foundation
 import Synchronization
 
-/// Software volume for an output device that has no volume control of its own (docs/DESIGN.md §7.9).
+/// Software volume for an output device that has no volume control of its own (Docs/DESIGN.md §7.9).
 ///
 /// A process tap takes the audio other apps send to the device and keeps it from reaching the hardware. A private
 /// aggregate device made of that tap and the device plays it into the device again, scaled by the gain. The IO block is

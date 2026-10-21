@@ -1,6 +1,6 @@
 import AppKit
 
-/// The Devices settings tab (docs/DESIGN.md §7.6): every output device, what it supports, and whether the Dial may use it,
+/// The Devices settings tab (Docs/DESIGN.md §7.6): every output device, what it supports, and whether the Dial may use it,
 /// and the input device to keep (§7.13).
 ///
 /// Connected devices come first, then remembered ones that are absent right now. The device list is observed only while

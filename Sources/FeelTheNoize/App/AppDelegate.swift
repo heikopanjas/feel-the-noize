@@ -1,7 +1,7 @@
 import AppKit
 import CoreAudio
 
-/// Owns all long-lived objects, wires their callbacks, starts and stops them (docs/DESIGN.md §6).
+/// Owns all long-lived objects, wires their callbacks, starts and stops them (Docs/DESIGN.md §6).
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings: Settings
     private let audio: AudioOutput
@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Retries a Dial held by another process, and opening the Dial after the user may have granted Input Monitoring
-    /// (docs/DESIGN.md §9.2).
+    /// (Docs/DESIGN.md §9.2).
     func applicationDidBecomeActive(_ notification: Notification) {
         dial.retryIfInUseElsewhere()
         guard isAccessDenied else { return }
@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.setVolume(volume)
     }
 
-    /// While a device is kept, the menu choice becomes the new kept device (docs/DESIGN.md §7.13). The keep moves before the
+    /// While a device is kept, the menu choice becomes the new kept device (Docs/DESIGN.md §7.13). The keep moves before the
     /// switch, so the keeper does not revert it.
     private func selectInputFromMenu(_ uid: String) {
         if settings.keptInputDeviceUID != nil {
@@ -166,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         selectDefaultDevice(uid, scope: kAudioDevicePropertyScopeInput)
     }
 
-    /// `AudioOutput` and the open menu follow the new default through their own listeners (docs/DESIGN.md §7.11).
+    /// `AudioOutput` and the open menu follow the new default through their own listeners (Docs/DESIGN.md §7.11).
     private func selectDefaultDevice(_ uid: String, scope: AudioObjectPropertyScope) {
         let direction = scope == kAudioDevicePropertyScopeInput ? "input" : "output"
         do {
@@ -183,7 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The turn that wakes the Dial is lost while macOS reconnects, so a click tells the user when the Dial is ready. An
-    /// app cannot wake a sleeping Dial (docs/DESIGN.md §2.1), so after a launch the user's touch is the wake-up as well.
+    /// app cannot wake a sleeping Dial (Docs/DESIGN.md §2.1), so after a launch the user's touch is the wake-up as well.
     /// A Dial already awake at launch gets no click but an immediate keep-alive, since its idle time is unknown (§7.14).
     private func confirmConnection(_ connection: DialConnection) {
         guard connection == .connected else { return }

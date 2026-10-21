@@ -1,5 +1,5 @@
 // Renders the Feel the Noize app icon into an AppIcon.appiconset directory.
-// Usage: swift scripts/render-icon.swift Sources/FeelTheNoize/Resources/Assets.xcassets/AppIcon.appiconset
+// Usage: swift Scripts/render-icon.swift Sources/FeelTheNoize/Resources/Assets.xcassets/AppIcon.appiconset
 import AppKit
 import CoreGraphics
 

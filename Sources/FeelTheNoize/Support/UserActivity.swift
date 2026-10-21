@@ -1,6 +1,6 @@
 import IOKit.pwr_mgt
 
-/// Tells macOS that the user is active while the Dial is in use, as the mouse does (docs/DESIGN.md §7.15).
+/// Tells macOS that the user is active while the Dial is in use, as the mouse does (Docs/DESIGN.md §7.15).
 ///
 /// Feel the Noize seizes the Dial, so its reports never reach the HID event system. Without this, a sleeping display would not
 /// wake when the Dial turns, and the screen saver would start while the user adjusts the volume.

@@ -1,6 +1,6 @@
 import AppKit
 
-/// The menu's volume slider, drawn like the slider of the macOS Sound menu (docs/DESIGN.md §5.3): a bordered capsule track,
+/// The menu's volume slider, drawn like the slider of the macOS Sound menu (Docs/DESIGN.md §5.3): a bordered capsule track,
 /// a white fill up to a white round knob, and the output symbol at the left end.
 ///
 /// Only drawing is replaced; `NSSliderCell` keeps tracking, keyboard control and accessibility. Colors were measured on a

@@ -2,7 +2,7 @@ import Foundation
 import IOKit.ps
 
 /// Battery levels of Bluetooth accessories such as AirPods and of the Surface Dial, from the accessory power sources
-/// (docs/DESIGN.md §7.10, §7.12).
+/// (Docs/DESIGN.md §7.10, §7.12).
 ///
 /// `IOPSCopyPowerSourcesByType` is exported by IOKit but has no header, so it is looked up with `dlsym`; type 4 returns the
 /// accessory sources, decoded with the public `IOPSCopyPowerSourcesList` and `IOPSGetPowerSourceDescription`. If the

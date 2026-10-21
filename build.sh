@@ -31,7 +31,7 @@ Usage: ./build.sh [command ...]
   test       gen, then run the unit tests
   format     swift-format in place
   lint       swift-format lint --strict
-  diagrams   render docs/diagrams/*.puml to SVG
+  diagrams   render Docs/diagrams/*.puml to SVG
   icon       re-render the app icon
   release    test, then Developer ID signed build zipped to $ZIP
   notarize   submit $ZIP, staple, Gatekeeper check, re-zip
@@ -80,11 +80,11 @@ cmd_lint() {
 }
 
 cmd_diagrams() {
-    plantuml -tsvg docs/diagrams/*.puml
+    plantuml -tsvg Docs/diagrams/*.puml
 }
 
 cmd_icon() {
-    swift scripts/render-icon.swift Sources/FeelTheNoize/Resources/Assets.xcassets/AppIcon.appiconset
+    swift Scripts/render-icon.swift Sources/FeelTheNoize/Resources/Assets.xcassets/AppIcon.appiconset
 }
 
 # Developer ID signed, hardened, secure timestamp, no get-task-allow. Produces $ZIP, ready for `notarize`.

@@ -9,7 +9,7 @@ protocol HapticFeedback: AnyObject {
     func muteToggled(isMuted: Bool)
 }
 
-/// Gesture recognizer and the only place that decides what a Dial event does (docs/DESIGN.md §7.3).
+/// Gesture recognizer and the only place that decides what a Dial event does (Docs/DESIGN.md §7.3).
 final class DialController {
     private enum Gesture {
         case idle

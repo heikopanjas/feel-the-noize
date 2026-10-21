@@ -1,6 +1,6 @@
 import CoreAudio
 
-/// Live list of the visible output and input devices and the current defaults (docs/DESIGN.md §7.4, §7.11).
+/// Live list of the visible output and input devices and the current defaults (Docs/DESIGN.md §7.4, §7.11).
 ///
 /// The Devices settings tab and the status menu each own one and observe only while they are visible, so it adds no work
 /// while idle.

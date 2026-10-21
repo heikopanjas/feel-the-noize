@@ -1,6 +1,6 @@
 import AppKit
 
-/// Menu bar icon and menu (docs/DESIGN.md §5.2, §5.3, §7.5).
+/// Menu bar icon and menu (Docs/DESIGN.md §5.2, §5.3, §7.5).
 ///
 /// `update(audio:dial:isOutputEnabled:)` changes the icon and every menu line, so an open menu follows the Dial. The device
 /// sections and the Input line come from a device list that runs only while the menu is open (§7.11).

@@ -7,7 +7,7 @@ protocol SoftwareVolumePreferences: AnyObject {
     func setSoftwareVolumeLevel(_ uid: String, _ level: Float)
 }
 
-/// Wraps Core Audio for the current default output device (docs/DESIGN.md §7.4).
+/// Wraps Core Audio for the current default output device (Docs/DESIGN.md §7.4).
 ///
 /// Listener blocks are registered on the main queue, so all notifications arrive on the main thread.
 final class AudioOutput: AudioControlling {

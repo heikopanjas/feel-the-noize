@@ -1,6 +1,6 @@
 import AppKit
 
-/// One device in the Output or Input section of the menu (docs/DESIGN.md §5.3, §7.11): the device icon, the name, and the
+/// One device in the Output or Input section of the menu (Docs/DESIGN.md §5.3, §7.11): the device icon, the name, and the
 /// battery at the right edge, in the column of the Dial row's battery.
 ///
 /// A custom item view, because a menu item title cannot align anything with the right edge of the menu. It therefore

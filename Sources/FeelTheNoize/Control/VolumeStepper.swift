@@ -1,4 +1,4 @@
-/// Step math for Dial-driven volume changes (docs/DESIGN.md §7.3).
+/// Step math for Dial-driven volume changes (Docs/DESIGN.md §7.3).
 enum VolumeStepper {
     // Absorbs float noise so that a volume read back as 0.37999997 still counts as on the 0.38 grid line.
     private static let epsilon = 0.0001

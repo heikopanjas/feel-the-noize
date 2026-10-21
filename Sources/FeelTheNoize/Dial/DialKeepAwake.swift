@@ -1,7 +1,7 @@
 import AppKit
 
 /// Keeps the Surface Dial out of its 5-minute idle sleep while the Mac is in use, so the first turn is not lost to the
-/// 1.6 s reconnect (docs/DESIGN.md §7.14).
+/// 1.6 s reconnect (Docs/DESIGN.md §7.14).
 ///
 /// The Mac counts as in use while its displays are awake. That also covers watching a video without touching the Mac,
 /// where adjusting the volume matters most. The timer runs only while keep-awake is on, the Dial is connected and the

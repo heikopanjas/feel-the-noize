@@ -1,6 +1,6 @@
 import OSLog
 
-/// Logger categories from docs/DESIGN.md §7.8.
+/// Logger categories from Docs/DESIGN.md §7.8.
 enum Log {
     private static let subsystem = "com.panjas.FeelTheNoize"
 

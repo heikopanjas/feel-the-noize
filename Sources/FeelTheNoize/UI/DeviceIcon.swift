@@ -1,6 +1,6 @@
 import AppKit
 
-/// Device symbols in the status menu, drawn in a circle like the macOS Sound menu (docs/DESIGN.md §7.11).
+/// Device symbols in the status menu, drawn in a circle like the macOS Sound menu (Docs/DESIGN.md §7.11).
 ///
 /// Core Audio offers no device artwork (`kAudioDevicePropertyIcon` is absent on every device tested), so the symbol is
 /// chosen from the transport, the Apple product ID of Bluetooth devices and, for built-in devices, the system-given name.

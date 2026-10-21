@@ -1,6 +1,6 @@
 import AppKit
 
-/// The General settings tab from docs/DESIGN.md §7.6. Every change applies immediately.
+/// The General settings tab from Docs/DESIGN.md §7.6. Every change applies immediately.
 final class GeneralSettingsViewController: NSViewController {
     private static let margin: CGFloat = 20
 

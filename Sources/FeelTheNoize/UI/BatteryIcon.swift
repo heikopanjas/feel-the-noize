@@ -1,6 +1,6 @@
 import AppKit
 
-/// Battery symbol filled to the level, as in the battery indicators of the macOS menus (docs/DESIGN.md §5.3).
+/// Battery symbol filled to the level, as in the battery indicators of the macOS menus (Docs/DESIGN.md §5.3).
 ///
 /// SF Symbols offers the battery only in quarter steps (`battery.25` and so on), and `battery.100percent` ignores a
 /// variable value, so the symbol is drawn: a light outline with a terminal, filled with the secondary label color, or red

@@ -1,5 +1,5 @@
 /// Notices volume writes that the device undoes, as AirPods do while another Apple device owns their audio
-/// (docs/DESIGN.md §7.4).
+/// (Docs/DESIGN.md §7.4).
 ///
 /// Core Audio has no property for that ownership: the AirPods stay connected and report a settable volume, but restore
 /// the previous value 5 to 17 ms after every write (measured 2026-10-19).

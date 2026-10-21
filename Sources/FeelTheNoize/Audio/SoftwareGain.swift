@@ -1,6 +1,6 @@
 import Foundation
 
-/// Maps a software volume level (0…1, as shown to the user) to a linear amplitude factor (docs/DESIGN.md §7.9).
+/// Maps a software volume level (0…1, as shown to the user) to a linear amplitude factor (Docs/DESIGN.md §7.9).
 ///
 /// Loudness is perceived logarithmically, so the level is spread evenly in decibels over `range`; 0 is silence.
 nonisolated enum SoftwareGain {

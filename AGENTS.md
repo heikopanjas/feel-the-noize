@@ -16,7 +16,7 @@ Run `/init-session` at the beginning of each new session, OR read this entire fi
 
 Feel the Noize (formerly the working name Manopola) is a macOS menu bar app that turns a Microsoft Surface Dial into a hardware volume knob: turning changes the volume of the default output device, pressing toggles mute, and the Dial's haptic motor clicks on every step.
 
-The full specification is `docs/DESIGN.md`. Read it before writing code; it is the source of truth for architecture, HID report layouts, Core Audio usage, gestures and milestones.
+The full specification is `Docs/DESIGN.md`. Read it before writing code; it is the source of truth for architecture, HID report layouts, Core Audio usage, gestures and milestones.
 
 ## Technology Stack
 
@@ -45,9 +45,9 @@ confirmed your understanding.
 - Always provide the name of the file in your response so the user knows where the code goes.
 - Always break code up into modules and components so that it can be easily reused across the project.
 - All code you write MUST be fully optimized. ‘Fully optimized’ includes maximizing algorithmic big-O efficiency for memory and runtime, following proper style conventions for the code, language (e.g. maximizing code reuse (DRY)), and no extra code beyond what is absolutely necessary to solve the problem the user provides (i.e. no technical debt). If the code is not fully optimized, you will be fined $100.
-- Follow the module layout in `docs/DESIGN.md` §12; one primary type per file, file name matches the type.
-- Write only the code needed for the current milestone (`docs/DESIGN.md` §13). No speculative abstractions.
-- Hardware facts that M1 verifies (§14) must be written back into `docs/DESIGN.md` when confirmed or corrected.
+- Follow the module layout in `Docs/DESIGN.md` §12; one primary type per file, file name matches the type.
+- Write only the code needed for the current milestone (`Docs/DESIGN.md` §13). No speculative abstractions.
+- Hardware facts that M1 verifies (§14) must be written back into `Docs/DESIGN.md` when confirmed or corrected.
 
 ### Working Together
 
@@ -84,7 +84,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - New log entries go directly below the changelog marker in `UPDATES.md`, newest first; load the `recent-updates` skill for the full rules
 - Preserve the AGENTS.md structure: title header → timestamp → main instructions
 
-Architecture and behavior changes go into `docs/DESIGN.md` as well.
+Architecture and behavior changes go into `Docs/DESIGN.md` as well.
 
 ## Best Practices
 
@@ -106,14 +106,14 @@ Architecture and behavior changes go into `docs/DESIGN.md` as well.
 ### Testing
 
 - Unit tests: target `FeelTheNoizeTests` in `Tests/FeelTheNoizeTests`, hosted in the app; the app does not install `AppDelegate` while hosting tests, so a test run never seizes the Dial or touches the audio device
-- Hardware checks: the manual test checklist in `docs/DESIGN.md` §11.2
+- Hardware checks: the manual test checklist in `Docs/DESIGN.md` §11.2
 - Testing framework: Swift Testing
 
 ### Documentation
 
-- Specification: `docs/DESIGN.md` is the source of truth; architecture and behavior changes go there
+- Specification: `Docs/DESIGN.md` is the source of truth; architecture and behavior changes go there
 - Code comments: explain why, not what; `///` for documentation comments, `// MARK: -` to group sections
-- Diagrams: PlantUML in `docs/diagrams/`, rendered to SVG and embedded in `docs/DESIGN.md`
+- Diagrams: PlantUML in `Docs/diagrams/`, rendered to SVG and embedded in `Docs/DESIGN.md`
 - README: written for users
 - Changelog: maintained in `UPDATES.md` (see the `recent-updates` skill)
 
@@ -148,7 +148,7 @@ xcrun swift-format lint --recursive Sources Tests
 log stream --style compact --level debug --predicate 'subsystem == "com.panjas.FeelTheNoize"'
 
 # Render diagrams
-plantuml -tsvg docs/diagrams/*.puml
+plantuml -tsvg Docs/diagrams/*.puml
 ```
 
 ### Coding Conventions
@@ -160,9 +160,9 @@ plantuml -tsvg docs/diagrams/*.puml
 - Comments explain why, not what. `///` for documentation comments, `// MARK: -` to group sections.
 - Concurrency: everything is main-actor isolated. IOKit and Core Audio callbacks run on the main run loop / main queue and enter the actor with `MainActor.assumeIsolated`. No `@unchecked Sendable`, no locks. The single exception to main-actor isolation is the software volume IO block (`SoftwareVolume`), which runs on the HAL IO thread and shares only the gain through `Synchronization.Atomic` in a `nonisolated final class`; it must not allocate, lock or log. C callbacks resolve the main-actor owner from the context pointer before entering the actor; a non-Sendable CF argument such as `IOHIDDevice` is handed over through a commented `nonisolated(unsafe) let`, the only permitted unsafe opt-out.
 - Logging via `os.Logger(subsystem: "com.panjas.FeelTheNoize", category:)` with categories `dial`, `audio`, `control`, `ui`, defined in `Support/Log.swift`. A category is added with the milestone that first uses it.
-- Undeclared system APIs are allowed only where their failure degrades a non-essential feature, looked up with `dlsym` and recorded in `docs/DESIGN.md`. Currently only `IOPSCopyPowerSourcesByType` for the battery levels of the Dial and audio accessories (`AccessoryBattery`).
-- Milestone spike code that must not ship is wrapped in `#if DEBUG` and named in `docs/DESIGN.md` §13 together with the milestone that removes it.
-- Diagrams are PlantUML in `docs/diagrams/`, styled with the shared `visio2003.iuml` include.
+- Undeclared system APIs are allowed only where their failure degrades a non-essential feature, looked up with `dlsym` and recorded in `Docs/DESIGN.md`. Currently only `IOPSCopyPowerSourcesByType` for the battery levels of the Dial and audio accessories (`AccessoryBattery`).
+- Milestone spike code that must not ship is wrapped in `#if DEBUG` and named in `Docs/DESIGN.md` §13 together with the milestone that removes it.
+- Diagrams are PlantUML in `Docs/diagrams/`, styled with the shared `visio2003.iuml` include.
 
 <!-- {integration} -->
 

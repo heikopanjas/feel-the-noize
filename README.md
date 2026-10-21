@@ -100,7 +100,7 @@ xcrun notarytool store-credentials developer-id-notary \
 
 ## Design
 
-See [`docs/DESIGN.md`](docs/DESIGN.md) for the architecture, the Surface Dial HID protocol and the Core Audio details.
+See [`Docs/DESIGN.md`](Docs/DESIGN.md) for the architecture, the Surface Dial HID protocol and the Core Audio details.
 
 ## License
 

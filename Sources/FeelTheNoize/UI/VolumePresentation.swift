@@ -1,6 +1,6 @@
 import AppKit
 
-/// Images and text for a volume state, shared by the menu bar icon and the overlay (docs/DESIGN.md §5.2).
+/// Images and text for a volume state, shared by the menu bar icon and the overlay (Docs/DESIGN.md §5.2).
 enum VolumePresentation {
     /// The knob for the menu bar and the overlay. A device without volume control plays at its fixed full level, so the
     /// knob shows full; without any output device it shows the minimum. The caller dims it where nothing can change.

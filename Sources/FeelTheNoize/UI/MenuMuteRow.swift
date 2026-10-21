@@ -1,6 +1,6 @@
 import AppKit
 
-/// The Mute item of the menu (docs/DESIGN.md §5.3): "Mute" or, while muted, "Unmute", and at the right edge a speaker
+/// The Mute item of the menu (Docs/DESIGN.md §5.3): "Mute" or, while muted, "Unmute", and at the right edge a speaker
 /// symbol that shows whether the output is muted.
 ///
 /// A checkmark would make macOS add a state column to the whole menu, which shifts every standard item to the right while

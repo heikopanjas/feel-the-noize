@@ -8,7 +8,7 @@ struct ControlSettings: Equatable {
     var excludedDeviceUIDs: Set<String> = []
 }
 
-/// Typed wrapper around `UserDefaults` (docs/DESIGN.md §7.7). Out-of-range stored values fall back to the default.
+/// Typed wrapper around `UserDefaults` (Docs/DESIGN.md §7.7). Out-of-range stored values fall back to the default.
 final class Settings {
     static let detentChoices = [18, 24, 36, 48, 72]
     static let stepPercentChoices = [1, 2, 3, 5]
@@ -75,7 +75,7 @@ final class Settings {
         set { write(newValue, forKey: Key.showOverlay) }
     }
 
-    /// Keeps the Dial out of its idle sleep while the displays are awake (docs/DESIGN.md §7.14).
+    /// Keeps the Dial out of its idle sleep while the displays are awake (Docs/DESIGN.md §7.14).
     var keepDialAwake: Bool {
         get { defaults.bool(forKey: Key.keepDialAwake) }
         set { write(newValue, forKey: Key.keepDialAwake) }
@@ -122,7 +122,7 @@ final class Settings {
 
     // MARK: - Software Volume
 
-    /// Devices without volume control on which the user turned on software volume (docs/DESIGN.md §7.9).
+    /// Devices without volume control on which the user turned on software volume (Docs/DESIGN.md §7.9).
     var softwareVolumeDeviceUIDs: Set<String> {
         get { Set(defaults.stringArray(forKey: Key.softwareVolumeDevices) ?? []) }
         set { write(newValue.sorted(), forKey: Key.softwareVolumeDevices) }
@@ -147,7 +147,7 @@ final class Settings {
 
     // MARK: - Input Devices
 
-    /// The input device kept as default while it is connected (docs/DESIGN.md §7.13); `nil` when the keep is off. Stored as
+    /// The input device kept as default while it is connected (Docs/DESIGN.md §7.13); `nil` when the keep is off. Stored as
     /// an empty string for off.
     var keptInputDeviceUID: String? {
         get { defaults.string(forKey: Key.keptInputDevice).flatMap { $0.isEmpty ? nil : $0 } }
