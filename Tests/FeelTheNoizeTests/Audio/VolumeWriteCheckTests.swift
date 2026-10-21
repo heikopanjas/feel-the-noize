@@ -3,7 +3,7 @@ import Testing
 @testable import FeelTheNoize
 
 struct VolumeWriteCheckTests {
-    @Test func acceptedWriteIsNotRejected() {
+    @Test func acceptedWriteIsNotRejected() -> Void {
         var check = VolumeWriteCheck()
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.51)
@@ -12,25 +12,25 @@ struct VolumeWriteCheckTests {
         #expect(check.isPending == false)
     }
 
-    @Test func snapBackAfterTheEchoIsRejected() {
+    @Test func snapBackAfterTheEchoIsRejected() -> Void {
         var check = VolumeWriteCheck()
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.51)
         check.didRead(0.50)
-        #expect(check.isRejected)
+        #expect(check.isRejected == true)
         check.finish()
-        #expect(check.isRejected)
+        #expect(check.isRejected == true)
     }
 
-    @Test func fastSpinSnapsBackToTheVolumeBeforeTheFirstWrite() {
+    @Test func fastSpinSnapsBackToTheVolumeBeforeTheFirstWrite() -> Void {
         var check = VolumeWriteCheck()
         check.willWrite(0.51, current: 0.50)
         check.willWrite(0.52, current: 0.51)
         check.didRead(0.50)
-        #expect(check.isRejected)
+        #expect(check.isRejected == true)
     }
 
-    @Test func acceptedProbeClearsTheRejection() {
+    @Test func acceptedProbeClearsTheRejection() -> Void {
         var check = VolumeWriteCheck()
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.50)
@@ -38,12 +38,12 @@ struct VolumeWriteCheckTests {
 
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.51)
-        #expect(check.isRejected)
+        #expect(check.isRejected == true)
         check.finish()
         #expect(check.isRejected == false)
     }
 
-    @Test func rejectedProbeKeepsTheRejection() {
+    @Test func rejectedProbeKeepsTheRejection() -> Void {
         var check = VolumeWriteCheck()
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.50)
@@ -52,17 +52,17 @@ struct VolumeWriteCheckTests {
         check.willWrite(0.49, current: 0.50)
         check.didRead(0.50)
         check.finish()
-        #expect(check.isRejected)
+        #expect(check.isRejected == true)
     }
 
-    @Test func outsideChangeClearsTheRejection() {
+    @Test func outsideChangeClearsTheRejection() -> Void {
         var check = VolumeWriteCheck()
         check.willWrite(0.51, current: 0.50)
         check.didRead(0.50)
         check.finish()
 
         check.didRead(0.50)
-        #expect(check.isRejected)
+        #expect(check.isRejected == true)
         check.didRead(0.60)
         #expect(check.isRejected == false)
     }

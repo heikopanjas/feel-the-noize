@@ -22,7 +22,7 @@ struct AudioDeviceInfoTests {
             (kAudioDeviceTransportTypePCI, .other),
             (0, .other)
         ] as [(UInt32, AudioDeviceInfo.Transport)])
-    func transport(coreAudio: UInt32, expected: AudioDeviceInfo.Transport) {
+    func transport(coreAudio: UInt32, expected: AudioDeviceInfo.Transport) -> Void {
         #expect(AudioDeviceInfo.Transport(coreAudioTransportType: coreAudio) == expected)
     }
 
@@ -33,7 +33,7 @@ struct AudioDeviceInfoTests {
             (.displayPort, "DisplayPort"), (.airPlay, "AirPlay"), (.thunderbolt, "Thunderbolt"), (.virtual, "Virtual"),
             (.aggregate, "Aggregate"), (.other, "Other")
         ] as [(AudioDeviceInfo.Transport, String)])
-    func label(transport: AudioDeviceInfo.Transport, expected: String) {
+    func label(transport: AudioDeviceInfo.Transport, expected: String) -> Void {
         #expect(transport.label == expected)
     }
 }

@@ -24,7 +24,7 @@ struct AudioDeviceListTests {
         return coreAudio
     }
 
-    @Test func listsVisibleDevicesWithStreamsAndTheDefaults() throws {
+    @Test func listsVisibleDevicesWithStreamsAndTheDefaults() throws -> Void {
         let coreAudio = Self.populated()
         let list = AudioDeviceList(coreAudio: coreAudio)
         var changes = 0
@@ -57,7 +57,7 @@ struct AudioDeviceListTests {
         #expect(mic.outputDataSource == nil)
     }
 
-    @Test func reloadsOnEveryObservedChangeAndStopsCleanly() {
+    @Test func reloadsOnEveryObservedChangeAndStopsCleanly() -> Void {
         let coreAudio = Self.populated()
         let list = AudioDeviceList(coreAudio: coreAudio)
         var changes = 0
@@ -83,7 +83,7 @@ struct AudioDeviceListTests {
         #expect(changes == 4)
     }
 
-    @Test func startTwiceRegistersOnce() {
+    @Test func startTwiceRegistersOnce() -> Void {
         let coreAudio = Self.populated()
         let list = AudioDeviceList(coreAudio: coreAudio)
         list.start()

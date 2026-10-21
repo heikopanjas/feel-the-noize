@@ -13,11 +13,11 @@ struct AccessoryBatteryTests {
             ("C132E7E4-A0B8-2D02-BE44-B373CD9AA007", nil),
             ("BuiltInSpeakerDevice", nil)
         ] as [(String, String?)])
-    func address(text: String, expected: String?) {
+    func address(text: String, expected: String?) -> Void {
         #expect(AccessoryBattery.address(in: text) == expected)
     }
 
-    @Test func singleCellFromTheAirPodsMaxCapture() throws {
+    @Test func singleCellFromTheAirPodsMaxCapture() throws -> Void {
         let batteries = AccessoryBattery.batteries(from: [
             [
                 "Accessory Identifier": "70:F9:4A:A8:CE:BF", "Group Identifier": "70:F9:4A:A8:CE:BF", "Part Identifier": "Single",
@@ -29,7 +29,7 @@ struct AccessoryBatteryTests {
         #expect(battery.singleLevel == 96)
     }
 
-    @Test func airPodsPartsAreGroupedAndOrdered() throws {
+    @Test func airPodsPartsAreGroupedAndOrdered() throws -> Void {
         let group = "AA:BB:CC:DD:EE:FF"
         let batteries = AccessoryBattery.batteries(from: [
             ["Group Identifier": group, "Accessory Identifier": "AA:BB:CC:DD:EE:01", "Part Identifier": "Case", "Current Capacity": 40],
@@ -41,16 +41,16 @@ struct AccessoryBatteryTests {
         #expect(battery.singleLevel == nil)
     }
 
-    @Test func sourcesWithoutAddressOrLevelAreSkipped() {
+    @Test func sourcesWithoutAddressOrLevelAreSkipped() -> Void {
         let batteries = AccessoryBattery.batteries(from: [
             ["Accessory Identifier": "C132E7E4-A0B8-2D02-BE44-B373CD9AA007", "Current Capacity": 98, "Name": "Surface Dial"],
             ["Accessory Identifier": "11:22:33:44:55:66", "Part Identifier": "Case"],
             ["Accessory Identifier": "11:22:33:44:55:77", "Part Identifier": "Unknown", "Current Capacity": 50]
         ])
-        #expect(batteries.isEmpty)
+        #expect(batteries.isEmpty == true)
     }
 
-    @Test func casePartLeftOutWhileItReportsNothing() throws {
+    @Test func casePartLeftOutWhileItReportsNothing() throws -> Void {
         let batteries = AccessoryBattery.batteries(from: [
             ["Group Identifier": "AA:BB:CC:DD:EE:FF", "Part Identifier": "Left", "Current Capacity": 80],
             ["Group Identifier": "AA:BB:CC:DD:EE:FF", "Part Identifier": "Case"]
@@ -58,7 +58,14 @@ struct AccessoryBatteryTests {
         #expect(try #require(batteries["AABBCCDDEEFF"]).text == "L 80 %")
     }
 
-    @Test func dialFoundByVendorAndProduct() {
+    @Test func levelsAreClampedToPercent() throws -> Void {
+        let batteries = AccessoryBattery.batteries(from: [
+            ["Accessory Identifier": "AA:BB:CC:DD:EE:FF", "Part Identifier": "Single", "Current Capacity": 140]
+        ])
+        #expect(try #require(batteries["AABBCCDDEEFF"]).singleLevel == 100)
+    }
+
+    @Test func dialFoundByVendorAndProduct() -> Void {
         let descriptions: [[String: Any]] = [
             ["Accessory Identifier": "70:F9:4A:A8:CE:BF", "Vendor ID": 76, "Product ID": 8223, "Current Capacity": 96],
             [

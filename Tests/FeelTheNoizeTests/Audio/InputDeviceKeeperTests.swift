@@ -12,7 +12,7 @@ struct InputDeviceKeeperTests {
         return coreAudio
     }
 
-    @Test func switchesTheInputBackWheneverItChanges() {
+    @Test func switchesTheInputBackWheneverItChanges() -> Void {
         let coreAudio = Self.withInputs()
         let keeper = InputDeviceKeeper(coreAudio: coreAudio)
 
@@ -30,7 +30,7 @@ struct InputDeviceKeeperTests {
         #expect(coreAudio.defaultInputID == 1)
     }
 
-    @Test func disconnectedKeptDeviceIsLeftAlone() {
+    @Test func disconnectedKeptDeviceIsLeftAlone() -> Void {
         let coreAudio = Self.withInputs()
         let keeper = InputDeviceKeeper(coreAudio: coreAudio)
 
@@ -44,7 +44,7 @@ struct InputDeviceKeeperTests {
         #expect(coreAudio.defaultInputWrites == [3])
     }
 
-    @Test func turningTheKeepOffRemovesTheListeners() {
+    @Test func turningTheKeepOffRemovesTheListeners() -> Void {
         let coreAudio = Self.withInputs()
         let keeper = InputDeviceKeeper(coreAudio: coreAudio)
         keeper.keptUID = "m2"
@@ -60,7 +60,7 @@ struct InputDeviceKeeperTests {
         #expect(coreAudio.defaultInputWrites == [1], "Nothing is enforced while the keep is off")
     }
 
-    @Test func movingTheKeepSwitchesToTheNewDevice() {
+    @Test func movingTheKeepSwitchesToTheNewDevice() -> Void {
         let coreAudio = Self.withInputs()
         let keeper = InputDeviceKeeper(coreAudio: coreAudio)
         keeper.keptUID = "m2"

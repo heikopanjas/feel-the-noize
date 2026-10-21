@@ -96,7 +96,7 @@ struct AudioOutputTests {
 
     // MARK: - Default Output
 
-    @Test func startPublishesTheDefaultOutput() throws {
+    @Test func startPublishesTheDefaultOutput() throws -> Void {
         let fixture = Fixture(device: Self.speakers())
         let state = try #require(fixture.audio.state)
         #expect(state.deviceUID == "speakers")
@@ -110,13 +110,13 @@ struct AudioOutputTests {
         #expect(fixture.coreAudio.listenerCount == 4, "One listener on the system object and three on the device")
     }
 
-    @Test func noDefaultOutputPublishesNil() {
+    @Test func noDefaultOutputPublishesNil() -> Void {
         let fixture = Fixture(device: Self.speakers(), isDefault: false)
         #expect(fixture.audio.state == nil)
         #expect(fixture.changes.count == 0, "The initial nil equals the cached nil and is not news")
     }
 
-    @Test func switchingTheDefaultOutputMovesTheListeners() throws {
+    @Test func switchingTheDefaultOutputMovesTheListeners() throws -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.coreAudio.devices[Self.airPodsID] = FakeCoreAudio.Device(uid: "airpods", name: "AirPods", volume: 0.3, isMuted: false)
         fixture.coreAudio.defaultOutputID = Self.airPodsID
@@ -131,7 +131,7 @@ struct AudioOutputTests {
 
     // MARK: - External Changes
 
-    @Test func externalChangeIsPublished() {
+    @Test func externalChangeIsPublished() -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.coreAudio.devices[Self.speakersID]?.volume = 0.7
         fixture.notifyVolume()
@@ -139,7 +139,7 @@ struct AudioOutputTests {
         #expect(fixture.changes.count == 2)
     }
 
-    @Test func floatNoiseIsNotPublished() {
+    @Test func floatNoiseIsNotPublished() -> Void {
         let fixture = Fixture(device: Self.speakers(volume: 0.58))
         fixture.coreAudio.devices[Self.speakersID]?.volume = 0.580_000_04
         fixture.notifyVolume()
@@ -149,7 +149,7 @@ struct AudioOutputTests {
 
     // MARK: - Writes
 
-    @Test func setVolumeClampsWritesAndPublishesOptimistically() {
+    @Test func setVolumeClampsWritesAndPublishesOptimistically() -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.audio.setVolume(1.5)
         #expect(fixture.coreAudio.volumeWrites == [1])
@@ -157,7 +157,7 @@ struct AudioOutputTests {
         #expect(fixture.changes.count == 2)
     }
 
-    @Test func hardwareMuteIsWrittenAndPublished() {
+    @Test func hardwareMuteIsWrittenAndPublished() -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.audio.setMuted(true)
         #expect(fixture.coreAudio.muteWrites == [true])
@@ -168,7 +168,7 @@ struct AudioOutputTests {
 
     // MARK: - Emulated Mute
 
-    @Test func emulatedMuteRemembersAndRestoresTheVolume() {
+    @Test func emulatedMuteRemembersAndRestoresTheVolume() -> Void {
         let fixture = Fixture(device: Self.speakers(volume: 0.4, isMuted: nil))
         #expect(fixture.audio.state?.hasHardwareMute == false)
 
@@ -186,7 +186,7 @@ struct AudioOutputTests {
         expectClose(fixture.audio.state?.volume ?? -1, 0.4, tolerance: Self.tolerance)
     }
 
-    @Test func volumeSetElsewhereClearsTheEmulatedMute() {
+    @Test func volumeSetElsewhereClearsTheEmulatedMute() -> Void {
         let fixture = Fixture(device: Self.speakers(volume: 0.4, isMuted: nil))
         fixture.audio.setMuted(true)
         fixture.coreAudio.devices[Self.speakersID]?.volume = 0.6
@@ -195,7 +195,7 @@ struct AudioOutputTests {
         expectClose(fixture.audio.state?.volume ?? -1, 0.6, tolerance: Self.tolerance)
     }
 
-    @Test func turningUpWhileEmulatedMutedUnmutes() {
+    @Test func turningUpWhileEmulatedMutedUnmutes() -> Void {
         let fixture = Fixture(device: Self.speakers(volume: 0.4, isMuted: nil))
         fixture.audio.setMuted(true)
         fixture.audio.setVolume(0.42)
@@ -203,7 +203,7 @@ struct AudioOutputTests {
         expectClose(fixture.audio.state?.volume ?? -1, 0.42, tolerance: Self.tolerance)
     }
 
-    @Test func deviceWithoutMuteOrVolumeRefusesMute() throws {
+    @Test func deviceWithoutMuteOrVolumeRefusesMute() throws -> Void {
         let fixture = Fixture(device: Self.hdmi)
         let state = try #require(fixture.audio.state)
         #expect(state.canSetVolume == false)
@@ -217,7 +217,7 @@ struct AudioOutputTests {
 
     // MARK: - Software Volume
 
-    @Test func softwareVolumeStartsForAnOptedInDeviceWithoutVolumeControl() throws {
+    @Test func softwareVolumeStartsForAnOptedInDeviceWithoutVolumeControl() throws -> Void {
         let fixture = Fixture(device: Self.hdmi, softwareVolumeLevel: 0.7)
         #expect(fixture.softwareVolume.deviceUID == "hdmi")
         #expect(fixture.softwareVolume.level == 0.7)
@@ -233,7 +233,7 @@ struct AudioOutputTests {
         #expect(fixture.audio.state?.volume == 0.3)
     }
 
-    @Test func softwareVolumeMutesThroughTheLevel() {
+    @Test func softwareVolumeMutesThroughTheLevel() -> Void {
         let fixture = Fixture(device: Self.hdmi, softwareVolumeLevel: 0.7)
         fixture.audio.setMuted(true)
         #expect(fixture.softwareVolume.level == 0)
@@ -243,7 +243,7 @@ struct AudioOutputTests {
         #expect(fixture.audio.state?.isMuted == false)
     }
 
-    @Test func failedSoftwareVolumeIsRetriedOnlyAfterASettingsChange() {
+    @Test func failedSoftwareVolumeIsRetriedOnlyAfterASettingsChange() -> Void {
         let fixture = Fixture(device: Self.hdmi, softwareVolumeLevel: 0.7, softwareVolumeStartError: Self.tapError)
         #expect(fixture.softwareVolume.startCount == 1)
         #expect(fixture.audio.state?.canSetVolume == false)
@@ -262,7 +262,7 @@ struct AudioOutputTests {
         #expect(fixture.audio.softwareVolumeError == nil)
     }
 
-    @Test func softwareVolumeStopsWhenTheDeviceGetsNativeVolume() {
+    @Test func softwareVolumeStopsWhenTheDeviceGetsNativeVolume() -> Void {
         let fixture = Fixture(device: Self.hdmi, softwareVolumeLevel: 0.7)
         fixture.coreAudio.devices[Self.speakersID]?.volume = 0.5
         fixture.notifyDefaultOutput()
@@ -274,7 +274,7 @@ struct AudioOutputTests {
 
     // MARK: - Rejected Writes
 
-    @Test func rejectedWritesAreDetectedAndThenProbedOncePerSecond() async {
+    @Test func rejectedWritesAreDetectedAndThenProbedOncePerSecond() async -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.coreAudio.rejectsVolumeWrites = true
 
@@ -300,7 +300,7 @@ struct AudioOutputTests {
         #expect(fixture.coreAudio.volumeWrites.count == 3)
     }
 
-    @Test func anAcceptedProbeClearsTheRejection() async {
+    @Test func anAcceptedProbeClearsTheRejection() async -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.coreAudio.rejectsVolumeWrites = true
         fixture.audio.setVolume(0.52)
@@ -316,7 +316,7 @@ struct AudioOutputTests {
         expectClose(fixture.audio.state?.volume ?? -1, 0.54, tolerance: Self.tolerance)
     }
 
-    @Test func switchingTheOutputResetsTheRejection() {
+    @Test func switchingTheOutputResetsTheRejection() -> Void {
         let fixture = Fixture(device: Self.speakers())
         fixture.coreAudio.rejectsVolumeWrites = true
         fixture.audio.setVolume(0.52)
@@ -332,7 +332,7 @@ struct AudioOutputTests {
 
     // MARK: - Stop
 
-    @Test func stopDetachesEverything() {
+    @Test func stopDetachesEverything() -> Void {
         let fixture = Fixture(device: Self.hdmi, softwareVolumeLevel: 0.7)
         fixture.audio.stop()
         #expect(fixture.coreAudio.listenerCount == 0)

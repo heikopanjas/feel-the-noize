@@ -11,31 +11,31 @@ struct DialReportTests {
             ([0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A], DialInputReport(isPressed: false, delta: 1)),
             ([0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A], DialInputReport(isPressed: false, delta: 1))
         ] as [([UInt8], DialInputReport)])
-    func bothBufferShapes(bytes: [UInt8], expected: DialInputReport) {
+    func bothBufferShapes(bytes: [UInt8], expected: DialInputReport) -> Void {
         #expect(DialReport.parseInput(reportID: 1, bytes: bytes) == expected)
     }
 
-    @Test func clockwiseIsPositive() {
+    @Test func clockwiseIsPositive() -> Void {
         let report = DialReport.parseInput(reportID: 1, bytes: [0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A])
         #expect(report?.delta == 1)
     }
 
-    @Test func counterClockwiseIsNegative() {
+    @Test func counterClockwiseIsNegative() -> Void {
         let report = DialReport.parseInput(reportID: 1, bytes: [0x01, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x3A])
         #expect(report?.delta == -1)
     }
 
-    @Test func fastTurnCarriesSeveralDetents() {
+    @Test func fastTurnCarriesSeveralDetents() -> Void {
         let report = DialReport.parseInput(reportID: 1, bytes: [0x01, 0x00, 0xFD, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x3A])
         #expect(report?.delta == -3)
     }
 
-    @Test func pressed() {
+    @Test func pressed() -> Void {
         let report = DialReport.parseInput(reportID: 1, bytes: [0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A])
         #expect(report == DialInputReport(isPressed: true, delta: 0))
     }
 
-    @Test func touchBitIsIgnored() {
+    @Test func touchBitIsIgnored() -> Void {
         let report = DialReport.parseInput(reportID: 1, bytes: [0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A])
         #expect(report?.isPressed == false)
     }
@@ -49,18 +49,18 @@ struct DialReportTests {
             (1, []),
             (42, [0x2A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         ] as [(UInt32, [UInt8])])
-    func rejectsUnknownReports(reportID: UInt32, bytes: [UInt8]) {
+    func rejectsUnknownReports(reportID: UInt32, bytes: [UInt8]) -> Void {
         #expect(DialReport.parseInput(reportID: reportID, bytes: bytes) == nil)
     }
 
     // MARK: - Feature Report
 
-    @Test func hapticConfigurationWithHapticsOn() {
+    @Test func hapticConfigurationWithHapticsOn() -> Void {
         #expect(
             DialReport.hapticConfiguration(detentsPerRevolution: 36, hapticsEnabled: true) == [0x01, 0x24, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00])
     }
 
-    @Test func hapticConfigurationWithHapticsOff() {
+    @Test func hapticConfigurationWithHapticsOff() -> Void {
         #expect(
             DialReport.hapticConfiguration(detentsPerRevolution: 72, hapticsEnabled: false) == [0x01, 0x48, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00])
     }
@@ -68,21 +68,21 @@ struct DialReportTests {
     @Test(
         "Resolution multiplier is little-endian and clamped to 0...3600",
         arguments: [(3600, [0x10, 0x0E]), (5000, [0x10, 0x0E]), (-5, [0x00, 0x00]), (256, [0x00, 0x01])] as [(Int, [UInt8])])
-    func resolutionMultiplier(detents: Int, expected: [UInt8]) {
+    func resolutionMultiplier(detents: Int, expected: [UInt8]) -> Void {
         #expect(Array(DialReport.hapticConfiguration(detentsPerRevolution: detents, hapticsEnabled: true)[1 ... 2]) == expected)
     }
 
     // MARK: - Manual Triggers
 
-    @Test func unmutePattern() {
+    @Test func unmutePattern() -> Void {
         #expect(DialReport.manualTrigger(waveform: .click, repeatCount: 0, retriggerMilliseconds: 0) == [0x01, 0x00, 0x03, 0x00, 0x00])
     }
 
-    @Test func mutePattern() {
+    @Test func mutePattern() -> Void {
         #expect(DialReport.manualTrigger(waveform: .click, repeatCount: 1, retriggerMilliseconds: 120) == [0x01, 0x01, 0x03, 0x78, 0x00])
     }
 
-    @Test func endStopPattern() {
+    @Test func endStopPattern() -> Void {
         #expect(DialReport.manualTrigger(waveform: .buzz, repeatCount: 0, retriggerMilliseconds: 0) == [0x01, 0x00, 0x04, 0x00, 0x00])
     }
 }

@@ -3,7 +3,7 @@ import Testing
 @testable import FeelTheNoize
 
 struct DelayedActionTests {
-    @Test func runsOnceAfterTheDelayAndNotBefore() async {
+    @Test func runsOnceAfterTheDelayAndNotBefore() async -> Void {
         let sleeper = ManualSleeper()
         let action = DelayedAction(sleep: { duration in await sleeper.sleep(for: duration) })
         var runs = 0
@@ -20,7 +20,7 @@ struct DelayedActionTests {
         #expect(action.isPending == false)
     }
 
-    @Test func schedulingAgainReplacesThePendingAction() async {
+    @Test func schedulingAgainReplacesThePendingAction() async -> Void {
         let sleeper = ManualSleeper()
         let action = DelayedAction(sleep: { duration in await sleeper.sleep(for: duration) })
         var ran: [String] = []
@@ -39,7 +39,7 @@ struct DelayedActionTests {
         #expect(action.isPending == false)
     }
 
-    @Test func cancelDropsThePendingAction() async {
+    @Test func cancelDropsThePendingAction() async -> Void {
         let sleeper = ManualSleeper()
         let action = DelayedAction(sleep: { duration in await sleeper.sleep(for: duration) })
         var runs = 0
@@ -54,7 +54,7 @@ struct DelayedActionTests {
         #expect(runs == 0)
     }
 
-    @Test func theActionMayScheduleAgain() async {
+    @Test func theActionMayScheduleAgain() async -> Void {
         let sleeper = ManualSleeper()
         let action = DelayedAction(sleep: { duration in await sleeper.sleep(for: duration) })
         var runs = 0

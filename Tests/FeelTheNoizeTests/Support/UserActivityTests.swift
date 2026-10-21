@@ -4,7 +4,7 @@ import Testing
 @testable import FeelTheNoize
 
 struct UserActivityTests {
-    @Test func declaresAtMostOncePerInterval() {
+    @Test func declaresAtMostOncePerInterval() -> Void {
         var declarationCount = 0
         let activity = UserActivity(minimumInterval: .seconds(60)) {
             declarationCount += 1
@@ -16,7 +16,7 @@ struct UserActivityTests {
         #expect(declarationCount == 1)
     }
 
-    @Test func declaresAgainAfterTheInterval() {
+    @Test func declaresAgainAfterTheInterval() -> Void {
         var declarationCount = 0
         let activity = UserActivity(minimumInterval: .zero) {
             declarationCount += 1
@@ -27,7 +27,7 @@ struct UserActivityTests {
         #expect(declarationCount == 2)
     }
 
-    @Test func keepsDeclaringAfterAFailure() {
+    @Test func keepsDeclaringAfterAFailure() -> Void {
         var declarationCount = 0
         let activity = UserActivity(minimumInterval: .zero) {
             declarationCount += 1

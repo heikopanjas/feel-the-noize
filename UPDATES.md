@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.15, review 3.7: tests to the Swift skill)
+
+- the test target follows the swift-coding-conventions skill as well: `== true` / `== false` in every `#expect`, explicit `self.` and `Self.` in fixtures and fakes, explicit `return` in multi-line closures and helpers, `-> Void` on every test and fixture function, one condition per guard. `AccessoryBatteryTests` gains a clamp case and `KeepChoicesTests` a keep-off case found while rewriting. Reason: `Docs/CODE_REVIEW.md` milestone 3.7.
+- static stored properties in the test suites name their own type (`DeviceIconTests.device`, `KeepChoicesTests.input`), with a comment, because `Self` is not available in a static stored property initializer.
+- version bump: 1.2.14 to 1.2.15 (PATCH - tests only)
+
 ### 2026-10-22 (v1.2.14, review 3.6: one type per file recorded)
 
 - DESIGN.md §12 lists the files added by the review (`CoreAudioAccess`, `CoreAudioHAL`, `SoftwareVolumeControlling`, `SoftwareVolumePreferences`, `DelayedAction`, `ControlSettings`, `AudioControlling`, `HapticFeedback`, `DialInputReport`, `HapticWaveform`, `MenuMuteRow`) and the test folders, and states the one-type-per-file rule with its two private-helper exceptions (`Gain`, `LevelBar`) instead of the old note about co-located types. The splits themselves landed with 3.1 to 3.3. Reason: `Docs/CODE_REVIEW.md` milestone 3.6.

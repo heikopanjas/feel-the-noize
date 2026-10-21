@@ -3,7 +3,7 @@ import Testing
 @testable import FeelTheNoize
 
 struct DialKeepAwakeTests {
-    @Test func runsOnlyWhileEnabledConnectedAndDisplaysAwake() {
+    @Test func runsOnlyWhileEnabledConnectedAndDisplaysAwake() -> Void {
         let keepAwake = DialKeepAwake {}
         #expect(keepAwake.isRunning == false)
 
@@ -27,7 +27,7 @@ struct DialKeepAwakeTests {
         #expect(keepAwake.isRunning == false)
     }
 
-    @Test func stopEndsTheTimer() {
+    @Test func stopEndsTheTimer() -> Void {
         let keepAwake = DialKeepAwake {}
         keepAwake.isEnabled = true
         keepAwake.isDialConnected = true
@@ -35,7 +35,7 @@ struct DialKeepAwakeTests {
         #expect(keepAwake.isRunning == false)
     }
 
-    @Test func sendNowSendsOnlyWhileRunning() {
+    @Test func sendNowSendsOnlyWhileRunning() -> Void {
         var sendCount = 0
         let keepAwake = DialKeepAwake { sendCount += 1 }
         keepAwake.sendNow()
@@ -48,7 +48,7 @@ struct DialKeepAwakeTests {
         #expect(sendCount == 1)
     }
 
-    @Test func sendsAfterEachIntervalAndNotAtStart() async {
+    @Test func sendsAfterEachIntervalAndNotAtStart() async -> Void {
         let sleeper = ManualSleeper()
         var sendCount = 0
         let keepAwake = DialKeepAwake(sleep: { duration in await sleeper.sleep(for: duration) }) { sendCount += 1 }
@@ -69,7 +69,7 @@ struct DialKeepAwakeTests {
         sleeper.release()
     }
 
-    @Test func stopWhileAsleepSendsNothingMore() async {
+    @Test func stopWhileAsleepSendsNothingMore() async -> Void {
         let sleeper = ManualSleeper()
         var sendCount = 0
         let keepAwake = DialKeepAwake(sleep: { duration in await sleeper.sleep(for: duration) }) { sendCount += 1 }

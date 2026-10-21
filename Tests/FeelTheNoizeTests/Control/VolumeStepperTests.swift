@@ -19,27 +19,27 @@ struct VolumeStepperTests {
             (0.50, 3, 0.56),
             (0.50, -25, 0.00)
         ] as [(Float32, Int, Float32)])
-    func defaultStep(volume: Float32, detents: Int, expected: Float32) {
+    func defaultStep(volume: Float32, detents: Int, expected: Float32) -> Void {
         let result = VolumeStepper.volume(from: volume, detents: detents, step: 0.02)
         expectClose(result, expected, tolerance: Self.tolerance)
     }
 
-    @Test func fineStep() {
+    @Test func fineStep() -> Void {
         let result = VolumeStepper.volume(from: 0.37, detents: 1, step: 0.005)
         expectClose(result, 0.375, tolerance: Self.tolerance)
     }
 
     @Test("Float noise near a grid line neither skips nor repeats a step", arguments: [Float32(0.379_999_97), 0.380_000_03])
-    func floatNoise(volume: Float32) {
+    func floatNoise(volume: Float32) -> Void {
         expectClose(VolumeStepper.volume(from: volume, detents: 1, step: 0.02), 0.40, tolerance: Self.tolerance)
         expectClose(VolumeStepper.volume(from: volume, detents: -1, step: 0.02), 0.36, tolerance: Self.tolerance)
     }
 
-    @Test func zeroDetentsLeavesVolumeUnchanged() {
+    @Test func zeroDetentsLeavesVolumeUnchanged() -> Void {
         #expect(VolumeStepper.volume(from: 0.37, detents: 0, step: 0.02) == 0.37)
     }
 
-    @Test func stepThatDoesNotDivideOneStillReachesFull() {
+    @Test func stepThatDoesNotDivideOneStillReachesFull() -> Void {
         #expect(VolumeStepper.volume(from: 0.99, detents: 1, step: 0.03) == 1)
     }
 }

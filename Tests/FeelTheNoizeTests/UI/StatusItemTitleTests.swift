@@ -10,7 +10,7 @@ struct StatusItemTitleTests {
             (.notConnected, "Surface Dial: Not Connected"),
             (.inUseElsewhere, "Surface Dial: In Use by Another App")
         ] as [(DialConnection, String)])
-    func dialTitle(connection: DialConnection, expected: String) {
+    func dialTitle(connection: DialConnection, expected: String) -> Void {
         #expect(StatusItemController.title(for: connection) == expected)
     }
 
@@ -19,12 +19,12 @@ struct StatusItemTitleTests {
         arguments: [
             (String?.some("MOTU M2"), false, "Input: MOTU M2"), ("MOTU M2", true, "Input: MOTU M2 (kept)"), (nil, false, "Input: None")
         ] as [(String?, Bool, String)])
-    func inputTitle(name: String?, isKept: Bool, expected: String) {
+    func inputTitle(name: String?, isKept: Bool, expected: String) -> Void {
         #expect(StatusItemController.inputTitle(name, isKept: isKept) == expected)
     }
 
     @Test("Device sections split by direction and sort by name")
-    func deviceSections() {
+    func deviceSections() -> Void {
         let devices = [
             Self.device("MOTU M2", output: true, input: true),
             Self.device("MacBook Pro Speakers", output: true, input: false),
@@ -38,14 +38,14 @@ struct StatusItemTitleTests {
         #expect(sections.inputs.map(\.name) == ["AirPods Pro", "MacBook Pro Microphone", "MOTU M2"])
     }
 
-    private static func device(_ name: String, output: Bool, input: Bool) -> AudioDeviceInfo {
-        AudioDeviceInfo(
-            uid: name, name: name, transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: output, hasInput: input, canSetVolume: output,
-            hasHardwareMute: false)
-    }
-
-    @Test func muteTitleFollowsTheState() {
+    @Test func muteTitleFollowsTheState() -> Void {
         #expect(MenuMuteRow.title(isMuted: false) == "Mute")
         #expect(MenuMuteRow.title(isMuted: true) == "Unmute")
+    }
+
+    private static func device(_ name: String, output: Bool, input: Bool) -> AudioDeviceInfo {
+        return AudioDeviceInfo(
+            uid: name, name: name, transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: output, hasInput: input, canSetVolume: output,
+            hasHardwareMute: false)
     }
 }

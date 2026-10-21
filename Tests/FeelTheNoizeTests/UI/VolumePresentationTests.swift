@@ -6,7 +6,7 @@ struct VolumePresentationTests {
     @Test(
         "Percent text rounds to whole percent",
         arguments: [(Float32(0), "0 %"), (0.42, "42 %"), (0.424, "42 %"), (0.425, "43 %"), (1, "100 %")] as [(Float32, String)])
-    func percent(volume: Float32, expected: String) {
+    func percent(volume: Float32, expected: String) -> Void {
         #expect(VolumePresentation.percent(volume) == expected)
     }
 
@@ -20,12 +20,12 @@ struct VolumePresentationTests {
             (state(volume: 1, isMuted: true, canSetVolume: false), "Volume not adjustable, muted"),
             (state(volume: 0.5, isInUseElsewhere: true), "Volume in use by another device")
         ] as [(AudioState?, String)])
-    func accessibilityDescription(state: AudioState?, expected: String) {
+    func accessibilityDescription(state: AudioState?, expected: String) -> Void {
         #expect(VolumePresentation.accessibilityDescription(for: state) == expected)
     }
 
     @Test("Knob image is a template of the requested size with the description", arguments: [nil, state(volume: 0.42)] as [AudioState?])
-    func knobImage(state: AudioState?) {
+    func knobImage(state: AudioState?) -> Void {
         let image = VolumePresentation.knobImage(for: state, style: .arc, size: 18, accessibilityDescription: "test")
         #expect(image.isTemplate == true)
         #expect(image.accessibilityDescription == "test")
