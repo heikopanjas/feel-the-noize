@@ -834,19 +834,21 @@ FeelTheNoize/
 │   └── diagrams/                  PlantUML sources (+ rendered SVGs)
 ├── Sources/FeelTheNoize/
 │   ├── App/                       main.swift, AppDelegate.swift
-│   ├── Dial/                      DialDevice.swift, DialReport.swift, DialEvent.swift,
-│   │                              DialConnection.swift, DialKeepAwake.swift
-│   ├── Control/                   DialController.swift, VolumeStepper.swift
-│   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift,
-│   │                              CoreAudioProperty.swift, AudioDeviceList.swift, AudioDeviceInfo.swift, InputDeviceKeeper.swift,
-│   │                              AccessoryBattery.swift,
-│   │                              SoftwareVolume.swift, SoftwareGain.swift, VolumeWriteCheck.swift
+│   ├── Dial/                      DialDevice.swift, DialReport.swift, DialInputReport.swift, HapticWaveform.swift,
+│   │                              DialEvent.swift, DialConnection.swift, DialKeepAwake.swift
+│   ├── Control/                   DialController.swift, AudioControlling.swift, HapticFeedback.swift, VolumeStepper.swift
+│   ├── Audio/                     AudioOutput.swift, AudioState.swift, CoreAudioError.swift, CoreAudioProperty.swift,
+│   │                              CoreAudioAccess.swift, CoreAudioHAL.swift, AudioDeviceList.swift, AudioDeviceInfo.swift,
+│   │                              InputDeviceKeeper.swift, AccessoryBattery.swift, SoftwareVolume.swift,
+│   │                              SoftwareVolumeControlling.swift, SoftwareVolumePreferences.swift, SoftwareGain.swift,
+│   │                              VolumeWriteCheck.swift
 │   ├── UI/                        StatusItemController.swift, VolumeOverlay.swift,
 │   │                              SettingsWindowController.swift, GeneralSettingsViewController.swift,
 │   │                              DeviceSettingsViewController.swift, VolumePresentation.swift,
 │   │                              KnobIcon.swift, DeviceIcon.swift, VolumeSlider.swift,
-│   │                              BatteryIcon.swift, MenuInfoRow.swift, MenuDeviceRow.swift
-│   ├── Support/                   Settings.swift, LoginItem.swift, Log.swift, UserActivity.swift
+│   │                              BatteryIcon.swift, MenuInfoRow.swift, MenuMuteRow.swift, MenuDeviceRow.swift
+│   ├── Support/                   Settings.swift, ControlSettings.swift, LoginItem.swift, Log.swift, UserActivity.swift,
+│   │                              DelayedAction.swift
 │   └── Resources/                 Assets.xcassets
 └── Tests/FeelTheNoizeTests/      Swift Testing suites (from M2), grouped like Sources
     ├── Audio/, Control/, Dial/,   one <Type>Tests.swift per production file
@@ -854,7 +856,7 @@ FeelTheNoize/
     └── Fixtures/                  ManualSleeper, Expectations and the fakes shared by the suites
 ```
 
-`HapticWaveform`, `DialInputReport` live in `DialReport.swift`; `AudioControlling` and `HapticFeedback` in `DialController.swift`; `ControlSettings` in `Settings.swift` (alone there in M3; `AppDelegate` passes the §7.7 defaults until the `Settings` store arrives in M4).
+One primary type per file, named after it (AGENTS.md, swift-coding-conventions). The only types that share a file are private helpers of their owner: `Gain` in `SoftwareVolume.swift` and `LevelBar` in `VolumeOverlay.swift`. The code follows the skill's conventions throughout since 2026-10-22 (`Docs/CODE_REVIEW.md`): explicit `self.` and `Self.`, `== true` / `== false` in conditions, explicit `return`, `-> Void`, one condition per `guard` or `if`, guards only before any other statement, one pattern per `case`.
 
 Build, through `build.sh` (several commands run in order, for example `./build.sh lint test`):
 

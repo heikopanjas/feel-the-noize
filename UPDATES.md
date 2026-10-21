@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.14, review 3.6: one type per file recorded)
+
+- DESIGN.md §12 lists the files added by the review (`CoreAudioAccess`, `CoreAudioHAL`, `SoftwareVolumeControlling`, `SoftwareVolumePreferences`, `DelayedAction`, `ControlSettings`, `AudioControlling`, `HapticFeedback`, `DialInputReport`, `HapticWaveform`, `MenuMuteRow`) and the test folders, and states the one-type-per-file rule with its two private-helper exceptions (`Gain`, `LevelBar`) instead of the old note about co-located types. The splits themselves landed with 3.1 to 3.3. Reason: `Docs/CODE_REVIEW.md` milestone 3.6.
+- version bump: 1.2.13 to 1.2.14 (PATCH - documentation of the structure)
+
 ### 2026-10-22 (v1.2.13, review 3.5: UI and app to the Swift skill)
 
 - `StatusItemController`, `VolumeOverlay`, `SettingsWindowController`, `GeneralSettingsViewController`, `DeviceSettingsViewController`, `VolumeSlider`, `MenuInfoRow`, `MenuMuteRow`, `MenuDeviceRow`, `AppDelegate` and `main.swift` rewritten to the swift-coding-conventions skill. Helpers split out so every guard is first in its function: `StatusItemController.updateButton`, `isButtonDisabled`, `rebuildDeviceItems` and `menuItem(for:)`; `AppDelegate.rememberInputName` and `switchDefaultDevice`. The nested ternaries in `MenuMuteRow.draw` became an `if` chain. No behavior change; checklist items 5 to 10, 14 to 17 and 22 cover the UI on hardware. Reason: `Docs/CODE_REVIEW.md` §3.
