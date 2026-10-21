@@ -886,7 +886,14 @@ M8 depends only on the input list and the default device write from M6, so it ca
 
 - Modes switchable by long press: media transport, scrolling, output device selection.
 - Per-device step size.
-- Input (microphone) mute as an alternative press action.
+- Input (microphone) mute as an alternative press action. Evaluated as M9 on 2026-10-21 and dropped by the developer, who uses only the MOTU M2 for meetings, and the M2 cannot be muted:
+  - Hardware input mute and input volume exist on AirPods Max and the MacBook Pro Microphone. The M2, Cam Link 4K and iPhone microphone have no input mute or volume on any element and own no such controls.
+  - Software mute like §7.9 is impossible: a process tap captures only what apps play, and `kAudioHardwarePropertyProcessInputMute` mutes only the calling process.
+  - A silent stand-in device does not work either. A public aggregate built on a tap that captures nothing records silence, but Core Audio reports `kAudioDevicePropertyDeviceCanBeDefaultDevice` 0 for any aggregate containing a tap, and silently ignores the default input write. A public aggregate without a tap reports 1.
+  - Remaining routes, not pursued:
+    - a virtual microphone driver: a HAL loopback plug-in fed by the app with the `SoftwareVolume` aggregate pattern; estimated 1.5 to 2.5 weeks, C code and an admin install
+    - the local third-party device API of Microsoft Teams
+    - Zoom's global shortcut, which needs the Accessibility permission
 
 ## 16. References
 
