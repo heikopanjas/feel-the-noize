@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.2, review 1.2: keep-awake timer test without the clock)
+
+- `DialKeepAwake` takes its sleep as an injected `(Duration) async -> Void`, `Task.sleep` by default; the tests pass the new `ManualSleeper` fixture (`Tests/FeelTheNoizeTests/Fixtures`), which parks the timer on a continuation and releases it on demand. Reason: `Docs/CODE_REVIEW.md` §2.2; the old test polled with 10 ms sleeps under a 2 s deadline, the only timing-dependent test in the suite.
+- a closure rather than `any Clock<Duration>`: a lock-free manual clock would need an isolated `Clock` conformance or a `Mutex`, both ruled out by the project's concurrency rules; the closure keeps the fixture on the main actor with no synchronization.
+- version bump: 1.2.1 to 1.2.2 (PATCH - test determinism, no behavior change)
+
 ### 2026-10-22 (v1.2.1, review 1.1: battery list nil guard)
 
 - `AccessoryBattery.read()` optional-chains `IOPSCopyPowerSourcesList`, whose result is implicitly unwrapped; a missing list now yields no readings instead of a crash when the menu opens. Reason: `Docs/CODE_REVIEW.md` §2.1.

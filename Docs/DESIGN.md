@@ -766,7 +766,7 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 | `VolumeStepperTests` | all vectors in §7.3, clamping, fine step |
 | `VolumeWriteCheckTests` | an accepted write, a snap-back after the echo, a fast spin returning to the volume before the first write, a probe that clears or keeps the rejection, a change from elsewhere |
 | `UserActivityTests` | declares at most once per interval, again after it, and keeps declaring after a failure |
-| `DialKeepAwakeTests` | the timer runs only while enabled, connected and displays awake; `stop()` ends it; reports are sent after each interval, not at start; `sendNow()` sends only while the timer runs |
+| `DialKeepAwakeTests` | the timer runs only while enabled, connected and displays awake; `stop()` ends it; reports are sent after each interval, not at start, and none after `stop()`, driven by the `ManualSleeper` fixture instead of the clock; `sendNow()` sends only while the timer runs |
 | `AccessoryBatteryTests` | address from Core Audio UIDs and power source identifiers, none from USB UIDs or UUIDs; single cell from the AirPods Max capture; AirPods parts grouped and ordered; sources without address, level or known part skipped; case left out while silent; Dial found by vendor and product ID |
 | `KeepChoicesTests` | keep popup choices: connected inputs sorted by name, an absent kept device as "(not connected)" with its remembered name or its UID |
 | `SettingsTests` | kept input off by default, round trip, stored empty for off, `onChange` only on change; input names remembered apart from outputs; defaults from §7.7, round trip of every key, out-of-range fallback, `onChange` per write, device exclusion round trip, `rememberDevices` merging and writing only new information; each test uses a private `UserDefaults` suite; software volume opt-in respects exclusion; levels start at 1.0 and are stored without `onChange`; icon style defaults to arc and falls back on unknown values |
@@ -777,6 +777,8 @@ The tests run hosted in the app. `main.swift` detects the test host through the 
 | `BatteryIconTests` | fill fraction clamped with a sliver for any charge, image size, accessibility description and ink at a low and a high level; battery text with the symbol for a single cell only |
 | `StatusItemTitleTests` | Dial status line for each connection state; Input line with and without a device and with "(kept)"; device sections split by direction and sorted by name, a device with both directions in both |
 | `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture; rotation on an output owned by another device probes and buzzes once per gesture |
+
+Timer code takes its sleep as an injected `(Duration) async -> Void` (`DialKeepAwake`, `DelayedAction`), `Task.sleep` in the app; the tests pass `ManualSleeper` (`Tests/FeelTheNoizeTests/Fixtures`), which parks the code under test on a continuation and lets the test release it, so no test waits on wall-clock time.
 
 `DialDevice`, `AudioOutput` and the UI are thin adapters over system frameworks and are covered by the manual checklist.
 

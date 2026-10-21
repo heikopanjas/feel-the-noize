@@ -28,12 +28,18 @@ final class DialKeepAwake {
     }
 
     private let interval: Duration
+    /// Waits one interval; `Task.sleep` in the app, a hand-driven stand-in in the tests, so no test waits on the clock.
+    private let sleep: (Duration) async -> Void
     private let send: () -> Void
     private var task: Task<Void, Never>?
     private var observers: [any NSObjectProtocol] = []
 
-    init(interval: Duration = DialKeepAwake.interval, send: @escaping () -> Void) {
+    init(
+        interval: Duration = DialKeepAwake.interval, sleep: @escaping (Duration) async -> Void = { try? await Task.sleep(for: $0) },
+        send: @escaping () -> Void
+    ) {
         self.interval = interval
+        self.sleep = sleep
         self.send = send
     }
 
@@ -80,9 +86,9 @@ final class DialKeepAwake {
         Log.dial.info("Keep-awake running")
         // The first report waits a full interval: the Dial has just connected or been in use, and an immediate Stop
         // trigger would cut the ready click short. A Dial awake at launch gets its first report through sendNow().
-        task = Task { [weak self, interval] in
+        task = Task { [weak self, interval, sleep = self.sleep] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: interval)
+                await sleep(interval)
                 guard !Task.isCancelled, let self else { return }
                 send()
             }
