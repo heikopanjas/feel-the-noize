@@ -81,7 +81,9 @@ struct AccessoryBattery: Equatable {
         }
         let copy = unsafeBitCast(symbol, to: CopyPowerSourcesByType.self)
         guard let blob = copy(accessoryType)?.takeRetainedValue() else { return Readings() }
-        let sources = IOPSCopyPowerSourcesList(blob).takeRetainedValue() as [CFTypeRef]
+        // The list is declared implicitly unwrapped; powerd returns none while it restarts, which must not crash the menu.
+        guard let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() else { return Readings() }
+        let sources = list as [CFTypeRef]
         let descriptions = sources.compactMap { IOPSGetPowerSourceDescription(blob, $0)?.takeUnretainedValue() as? [String: Any] }
         return Readings(devices: batteries(from: descriptions), dialLevel: dialLevel(from: descriptions))
     }

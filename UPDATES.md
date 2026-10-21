@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.1, review 1.1: battery list nil guard)
+
+- `AccessoryBattery.read()` optional-chains `IOPSCopyPowerSourcesList`, whose result is implicitly unwrapped; a missing list now yields no readings instead of a crash when the menu opens. Reason: `Docs/CODE_REVIEW.md` §2.1.
+- version bump: 1.2.0 to 1.2.1 (PATCH - crash guard)
+
 ### 2026-10-22 (v1.2.0, code review and fix plan, evening)
 
 - `Docs/CODE_REVIEW.md` added: a review of every source and test file against the swift-coding-conventions, swift-concurrency-pro and swift-testing-pro skills, with a four phase fix plan. Reason: requested by the developer before refactoring the pre-skill code to the skill rules.
