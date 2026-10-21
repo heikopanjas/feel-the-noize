@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, code review and fix plan, evening)
+
+- `Docs/CODE_REVIEW.md` added: a review of every source and test file against the swift-coding-conventions, swift-concurrency-pro and swift-testing-pro skills, with a four phase fix plan. Reason: requested by the developer before refactoring the pre-skill code to the skill rules.
+- decisions by the developer, recorded in the review's Decisions table: the guard-at-the-top rule applies literally (no exception); the test folder mirrors `Sources` by group with a `Fixtures/` folder for shared fakes; the `AudioOutput` testability seam (phase 4.1 and 4.2) runs before the convention sweep of the audio layer; commit confirmation is per milestone of the plan. Reason: settled up front so later sessions execute the plan without asking.
+- commits in cloud sessions are authored as the developer, set through repository-local git config, and the commit of the review was amended to that identity. Reason: the container's global git identity is an agent name, which the no-agent-attribution rule covers.
+- no version bump: documentation and conventions only.
+
 ### 2026-10-22 (v1.2.0, swift-build-commands reinstated)
 
 - The slopctl line telling agents to load the `swift-build-commands` skill is back in AGENTS.md, word for word, and the note that its commands do not apply is gone. The project Build Commands section stays beside it for the `build.sh` usage. Reason: requested by the developer; the skill works in the other XcodeGen projects (voltaic, zack, dashboard-of-doom), which keep the same line.

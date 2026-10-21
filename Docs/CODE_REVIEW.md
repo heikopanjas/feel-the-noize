@@ -16,7 +16,19 @@ What the review found falls into three groups, in decreasing order of importance
 2. **A systematic gap between the code and the `swift-coding-conventions` skill** (§3). The code was written in idiomatic Swift before the skill was adopted on 2026-10-22 ("Existing code is not yet refactored to the Swift skill", UPDATES.md). The skill's special rules (`== true` / `== false` in conditions, explicit `self.` and `Self.`, explicit `return`, `-> Void`, one condition per `guard`/`if`, one pattern per `case`, guards only at the top of a function, no nested ternaries, one type per file) are violated on most lines of most files. None of this is a bug; all of it is mechanical, and it is by far the largest body of work in this plan.
 3. **Testing improvements** (§4): the `#expect(!x)` form that defeats the macro's diagnostics, a slow timing test, logic in `AudioOutput` that is untested because its Core Audio access is a static hidden dependency, and a few cheap pure functions without tests.
 
-The fix plan (§5) orders the work so that behavior-affecting fixes land first in small, individually verifiable commits, the mechanical convention sweep comes next file by file with the formatter and tests as the safety net, and the testability refactor of `AudioOutput` comes last because it is the only item that changes structure.
+The fix plan (§5) orders the work so that behavior-affecting fixes land first in small, individually verifiable commits, the testability seam for `AudioOutput` comes next so the audio layer has unit tests before it is rewritten, and the mechanical convention sweep follows file by file with the formatter and tests as the safety net.
+
+### Decisions (2026-10-22, developer)
+
+Settled so later sessions can execute the plan without asking:
+
+| Question | Decision |
+|---|---|
+| Guard placement (skill rule C6, §3) | **Apply literally.** A `guard` may only precede every other statement in its function; mid-function guards become `if … { return }` or the function is restructured. No exception is recorded. |
+| Test folder layout (§4.5) | **Mirror `Sources`.** `Tests/FeelTheNoizeTests/<Group>/` matches the production file's group; fixtures live next to the suites that use them. Done once in Phase 2 (milestone 2.4). |
+| Phase order (§5) | **Phase 4.1–4.2 before Phase 3.3.** Execution order is 1 → 2 → 4.1, 4.2 → 3 (→ 4.3 optional). The audio-layer convention rewrite runs under unit tests, not the manual checklist. |
+| Commit cadence (§5) | **Per milestone.** One go-ahead for a milestone (or a list of milestones) covers every commit and push inside it; a summary follows at the end. Each commit still follows the `git-workflow` skill. |
+| `AudioDeviceInfo.isControllable` (§2.7) | **Remove** with its test (reviewer's call; no production caller, and AGENTS.md forbids speculative API). |
 
 ---
 
@@ -114,7 +126,7 @@ final class DelayedAction {
 ### 2.7 Dead or test-only API
 
 - `DialDevice.isConnected` (`DialDevice.swift:15-17`) — no callers. Remove.
-- `AudioDeviceInfo.isControllable` (`AudioDeviceInfo.swift:61-64`) — used only by its own test. Either remove it with the test or use it in `DeviceSettingsViewController` where the "Yes/No/Emulated" labels are derived (`muteLabel`). Removing is in keeping with "no speculative abstractions" (AGENTS.md).
+- `AudioDeviceInfo.isControllable` (`AudioDeviceInfo.swift:61-64`) — used only by its own test. Remove it with the test (decided; "no speculative abstractions", AGENTS.md).
 - `VolumeWriteCheck.isPending` is used by `finish()` and the tests — keep.
 - `Scripts/render-icon.swift` uses `!` and `try!` nine times. It is a build-time script outside `swift-format lint`'s paths, so it is exempt from `.swift-format`, but not from the skill. Low priority; convert to `guard … else { exit(1) }` when the script is next touched (Phase 4).
 
@@ -206,7 +218,7 @@ Tests that this unlocks (each a bug class that has already shipped or been debug
 
 - `KnobIconTests.drawsInk` loops over `isMuted in [false, true]` inside one test. Parameterize over `zip`/product of styles and mute states so a failure names the case.
 - The `abs(a - b) < tolerance` comparisons (`DialControllerTests`, `VolumeStepperTests`, `SoftwareGainTests`, `BatteryIconTests`, `KnobIconTests`) could share one helper `expectClose(_:_:tolerance:sourceLocation: #_sourceLocation)` so failures print both values and point at the calling line. Optional; no external package (swift-numerics is out by the no-dependency rule).
-- Tests are flat in one folder while production code is grouped (`Audio/`, `Dial/`, …). The skill says not to reorganize existing tests without permission; listed here as a question for the developer, not as a task.
+- Tests are flat in one folder while production code is grouped (`Audio/`, `Dial/`, …). Decided: mirror the source layout (milestone 2.4); the skill's "ask first" condition is met.
 - `KeepChoicesTests` tests a static on `DeviceSettingsViewController`. Fine, but when 4.3 lands, `keepChoices` is a candidate to move to a small `Support/KeepChoices.swift` enum so the view controller file has no test-reachable logic.
 - The test target inherits `SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor` from `settings.base` in `project.yml`, which is why no test needs `@MainActor` and why closures capturing `var sendCount` compile. Add one sentence to DESIGN.md §11.1 so nobody "fixes" it by adding annotations.
 
@@ -214,7 +226,7 @@ Tests that this unlocks (each a bug class that has already shipped or been debug
 
 ## 5. Fix Plan
 
-Four phases. Each milestone is a commit (or a few) that leaves `./build.sh lint test` green and the manual checklist items named in it passing. Version bumps follow the `semantic-versioning` skill: behavior fixes are PATCH, the testability refactor is PATCH (no user-visible change), the convention sweep is PATCH; nothing here is MINOR. Every milestone that changes a design fact updates DESIGN.md in the same commit, and every convention or structure decision gets an UPDATES.md entry.
+Four phases, executed in the order **1 → 2 → 4.1, 4.2 → 3 → 4.3 (optional)** per the decisions above. Each milestone is a commit (or a few) that leaves `./build.sh lint test` green and the manual checklist items named in it passing. Version bumps follow the `semantic-versioning` skill: behavior fixes are PATCH, the testability refactor is PATCH (no user-visible change), the convention sweep is PATCH; nothing here is MINOR. Every milestone that changes a design fact updates DESIGN.md in the same commit, and every convention or structure decision gets an UPDATES.md entry. One go-ahead per milestone covers all its commits and pushes.
 
 ### Phase 1 — Defects and fragilities (behavior-affecting, small, first)
 
@@ -235,8 +247,9 @@ Phase 1 touches `AccessoryBattery`, `DialKeepAwake`, `Settings`, `AudioOutput`, 
 | **2.1 Macro-friendly expectations** | 4.1: remaining `#expect(!…)` → `== false` in `VolumeWriteCheckTests`, `SettingsTests`, `DeviceIconTests`, `BatteryIconTests`. | No `#expect(!` in `Tests` (`grep` in CI step or a lint note in AGENTS.md). |
 | **2.2 New pure tests** | 4.4: `VolumePresentationTests`, `CoreAudioErrorTests`, negative-detent argument in `DialReportTests`. | DESIGN.md §11.1 table lists the two suites. |
 | **2.3 Parameterize and helper** | 4.5: split `KnobIconTests.drawsInk`; optional `expectClose` helper with `#_sourceLocation`. | Failures in image tests name style and mute state. |
+| **2.4 Mirror the source layout** | Move each suite into `Tests/FeelTheNoizeTests/<Group>/` matching its production file (`Audio/`: AccessoryBattery, AudioDeviceInfo, SoftwareGain, VolumeWriteCheck; `Control/`: DialController, VolumeStepper; `Dial/`: DialReport, DialKeepAwake; `Support/`: Settings, UserActivity; `UI/`: BatteryIcon, DeviceIcon, KeepChoices, KnobIcon, StatusItemTitle); shared fixtures (`ManualClock`, later `FakeCoreAudio`) in `Fixtures/`; `git mv` only, no content change; `./build.sh gen`. Update AGENTS.md › Testing and DESIGN.md §11.1/§12. | `./build.sh test` green; `find Tests -name '*.swift'` mirrors `Sources`. |
 
-Small and independent; can be interleaved with Phase 1 or done in one commit.
+Small and independent; 2.1–2.3 can be interleaved with Phase 1; 2.4 is its own commit so the moves stay reviewable.
 
 ### Phase 3 — Convention sweep (`swift-coding-conventions`)
 
@@ -246,7 +259,7 @@ One commit per file or per small group of related files, each applying **C1–C8
 |---|---|---|
 | **3.1 Pure logic** | `VolumeStepper`, `DialReport`, `VolumeWriteCheck`, `SoftwareGain`, `AccessoryBattery`, `AudioDeviceInfo`, `CoreAudioError`, `KnobIcon`, `DeviceIcon`, `BatteryIcon`, `VolumePresentation` | unit tests |
 | **3.2 Control and support** | `DialController`, `Settings`, `UserActivity`, `DialKeepAwake`, `LoginItem`, `Log`, `DelayedAction` | unit tests |
-| **3.3 Audio adapters** | `AudioOutput`, `AudioDeviceList`, `InputDeviceKeeper`, `CoreAudioProperty`, `SoftwareVolume`, `AudioState` | Phase 4 tests if done first (see below), else checklist 1–4, 14–17 and the software-volume items |
+| **3.3 Audio adapters** | `AudioOutput`, `AudioDeviceList`, `InputDeviceKeeper`, `CoreAudioProperty`, `SoftwareVolume`, `AudioState`, `CoreAudioAccess` | `AudioOutputTests` from Phase 4.2 (which precedes this milestone), plus checklist 1–4, 14–17 and the software-volume items |
 | **3.4 Dial** | `DialDevice`, `DialEvent`, `DialConnection` | checklist 1–4, 11–13, sleep/wake |
 | **3.5 UI and app** | `StatusItemController`, `VolumeOverlay`, `SettingsWindowController`, `GeneralSettingsViewController`, `DeviceSettingsViewController`, `VolumeSlider`, `MenuInfoRow`, `MenuMuteRow`, `MenuDeviceRow`, `AppDelegate`, `main` | checklist 5–10 |
 | **3.6 File split (C9)** | new files for `HapticWaveform`, `DialInputReport`, `AudioControlling`, `HapticFeedback`, `ControlSettings`, `SoftwareVolumePreferences`; DESIGN.md §12 tree and the sentence under it; `./build.sh gen` | build green; §12 matches `find Sources -name '*.swift'` |
@@ -265,7 +278,7 @@ Per-file checklist for the sweep (paste into the commit body or PR description):
 
 Mechanical aids: the `== true` / `== false`, `-> Void` and implicit-return rewrites are regular enough that a one-off script (or careful editor regex) handles 80 % of them; `self.` qualification is not regex-safe (local shadowing, closure parameters, key paths) and must be done by reading each function. Budget the sweep at roughly the size of the code base itself in diff lines.
 
-Decision needed before 3.1 starts (ask the developer): C6 (`guard` only at the top of a function) is the one rule whose literal application makes some functions worse (`DialController.rotate`, `AudioOutput.setVolume`). The options are (a) apply literally, converting mid-function guards to `if … { return }`, (b) record an exception in AGENTS.md for guards that follow only `let` bindings. The plan assumes (a) because AGENTS.md says the skill wins; (b) needs an UPDATES.md entry.
+C6 (`guard` only at the top of a function) is applied literally (decided, see §1): mid-function guards in `DialController.rotate`, `AudioOutput.setVolume` and the others listed in §3 become `if … { return }`, or the function is split so each guard is first in its function. Prefer the split when it yields a named helper with one job (e.g. the end-of-range check in `rotate`); prefer `if` when the guard sits between two statements that belong together.
 
 ### Phase 4 — Testability of `AudioOutput`
 
@@ -275,7 +288,7 @@ Decision needed before 3.1 starts (ask the developer): C6 (`guard` only at the t
 | **4.2 Fake and tests** | `Tests/…/FakeCoreAudio.swift` recording writes and exposing `fireListener(address:)`; `AudioOutputTests` for the five behaviors listed in 4.3. | Tests green; DESIGN.md §11.1 table and the "thin adapters" sentence updated. |
 | **4.3 (optional) `AudioDeviceList` and `InputDeviceKeeper`** | Same seam; tests for "hidden and private aggregate devices filtered", "default UIDs read", "enforce switches back once and not in a loop". | Tests green. |
 
-Phase 4 is last because it restructures the audio layer; doing it after the convention sweep means the new files are written to the skill from the start. If the developer prefers, 4.1–4.2 can precede 3.3 so the `AudioOutput` convention rewrite is covered by unit tests instead of the manual checklist — that is the safer order and costs nothing but sequencing.
+Milestones 4.1 and 4.2 run **before Phase 3** (decided), so the `AudioOutput`, `AudioDeviceList` and `InputDeviceKeeper` convention rewrites in 3.3 are covered by unit tests. Because they land before the sweep, write the new files (`CoreAudioAccess.swift`, `FakeCoreAudio.swift`, `AudioOutputTests.swift`) to the skill's rules from the start, so 3.3 does not have to touch them again. 4.3 stays optional and last.
 
 ---
 

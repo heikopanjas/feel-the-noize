@@ -106,7 +106,9 @@ Architecture and behavior changes go into `Docs/DESIGN.md` as well.
 ### Testing
 
 - Unit tests: target `FeelTheNoizeTests` in `Tests/FeelTheNoizeTests`, hosted in the app; the app does not install `AppDelegate` while hosting tests, so a test run never seizes the Dial or touches the audio device
+- Test layout mirrors `Sources/FeelTheNoize`: a suite for `Sources/FeelTheNoize/<Group>/Foo.swift` lives in `Tests/FeelTheNoizeTests/<Group>/FooTests.swift`; shared fakes and fixtures in `Tests/FeelTheNoizeTests/Fixtures/` (the move of the existing flat suites is milestone 2.4 of `Docs/CODE_REVIEW.md`)
 - Hardware checks: the manual test checklist in `Docs/DESIGN.md` §11.2
+- Open review findings and the fix plan: `Docs/CODE_REVIEW.md`; its Decisions table settles the questions the plan raised, so execute it without re-asking
 - Testing framework: Swift Testing
 
 ### Documentation
@@ -150,9 +152,11 @@ Architecture rules of this app that supplement the `swift-coding-conventions` sk
 ## Commit Protocol
 
 - **NEVER commit automatically** — always wait for explicit user confirmation
+- Confirmation is per milestone of `Docs/CODE_REVIEW.md`: one go-ahead for a milestone (or a list of them) covers every commit and push inside it; outside that plan, confirm each commit
 - Stage changes, write a conventional commits message (max 50-char subject, 72-char body lines), then commit
 - Load the `git-workflow` skill for the full message format, character limits, and examples before committing
 - Never add co-authorship trailers or any attribution naming an AI coding agent to commit messages
+- Commits are authored as the developer (`Heiko Panjas <heiko@panjas.com>`); in a cloud session set `git config user.name` and `user.email` locally in the repository before the first commit, since the container's global identity is an agent name
 
 ## Recent Updates & Decisions
 
