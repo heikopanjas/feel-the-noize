@@ -8,76 +8,109 @@ final class AudioDeviceList {
     private static let observedAddresses = [
         CoreAudioProperty.devicesAddress, CoreAudioProperty.defaultOutputDeviceAddress, CoreAudioProperty.defaultInputDeviceAddress
     ]
+    private static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
     private(set) var devices: [AudioDeviceInfo] = []
     private(set) var defaultOutputUID: String?
     private(set) var defaultInputUID: String?
     var onChange: (() -> Void)?
 
+    private let coreAudio: any CoreAudioAccess
     private var listener: CoreAudioProperty.ListenerBlock?
 
-    func start() {
-        guard listener == nil else { return }
+    init(coreAudio: any CoreAudioAccess = CoreAudioHAL()) {
+        self.coreAudio = coreAudio
+    }
+
+    func start() -> Void {
+        guard self.listener == nil else {
+            return
+        }
         let listener: CoreAudioProperty.ListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
                 self?.reload()
             }
         }
         self.listener = listener
-        for var address in Self.observedAddresses {
-            let status = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+        for address in Self.observedAddresses {
+            let status = self.coreAudio.addListener(listener, for: address, on: Self.systemObject)
             if status != noErr {
                 Log.audio.error("\(CoreAudioError(status: status, operation: "Observing the device list"), privacy: .public)")
             }
         }
         Log.audio.info("Observing the device list")
-        reload()
+        self.reload()
     }
 
-    func stop() {
-        guard let listener else { return }
-        for var address in Self.observedAddresses {
-            AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+    func stop() -> Void {
+        guard let listener = self.listener else {
+            return
+        }
+        for address in Self.observedAddresses {
+            self.coreAudio.removeListener(listener, for: address, on: Self.systemObject)
         }
         self.listener = nil
         Log.audio.info("Stopped observing the device list")
     }
 
-    private func reload() {
+    private func reload() -> Void {
         do {
-            devices = try CoreAudioProperty.readDeviceIDs()
-                .filter { !CoreAudioProperty.isHidden($0) }
-                .compactMap(Self.describe)
+            self.devices = try self.coreAudio.readDeviceIDs()
+                .filter { self.coreAudio.isHidden($0) == false }
+                .compactMap { self.describe($0) }
                 // A private aggregate is visible to the process that made it; the software volume one is internal.
-                .filter { !$0.uid.hasPrefix(SoftwareVolume.aggregateUIDPrefix) }
+                .filter { $0.uid.hasPrefix(SoftwareVolume.aggregateUIDPrefix) == false }
         }
         catch {
             Log.audio.error("\(error, privacy: .public)")
-            devices = []
+            self.devices = []
         }
-        defaultOutputUID = Self.readDefaultUID(scope: kAudioDevicePropertyScopeOutput)
-        defaultInputUID = Self.readDefaultUID(scope: kAudioDevicePropertyScopeInput)
-        onChange?()
+        self.defaultOutputUID = self.readDefaultUID(scope: kAudioDevicePropertyScopeOutput)
+        self.defaultInputUID = self.readDefaultUID(scope: kAudioDevicePropertyScopeInput)
+        self.onChange?()
     }
 
-    private static func readDefaultUID(scope: AudioObjectPropertyScope) -> String? {
-        guard let deviceID = try? CoreAudioProperty.readDefaultDevice(scope: scope) else { return nil }
-        return try? CoreAudioProperty.readString(kAudioDevicePropertyDeviceUID, of: deviceID)
+    private func readDefaultUID(scope: AudioObjectPropertyScope) -> String? {
+        guard let deviceID = try? self.coreAudio.readDefaultDevice(scope: scope) else {
+            return nil
+        }
+        return try? self.coreAudio.readString(kAudioDevicePropertyDeviceUID, of: deviceID)
     }
 
     /// Devices without streams and devices that vanish between listing and reading are skipped.
-    private static func describe(_ deviceID: AudioObjectID) -> AudioDeviceInfo? {
-        let hasOutput = CoreAudioProperty.hasStreams(deviceID, scope: kAudioDevicePropertyScopeOutput)
-        let hasInput = CoreAudioProperty.hasStreams(deviceID, scope: kAudioDevicePropertyScopeInput)
-        guard hasOutput || hasInput,
-            let uid = try? CoreAudioProperty.readString(kAudioDevicePropertyDeviceUID, of: deviceID),
-            let name = try? CoreAudioProperty.readString(kAudioObjectPropertyName, of: deviceID)
-        else { return nil }
+    private func describe(_ deviceID: AudioObjectID) -> AudioDeviceInfo? {
+        guard let names = self.readNames(of: deviceID) else {
+            return nil
+        }
+        let hasOutput = self.coreAudio.hasStreams(deviceID, scope: kAudioDevicePropertyScopeOutput)
+        let hasInput = self.coreAudio.hasStreams(deviceID, scope: kAudioDevicePropertyScopeInput)
+        if hasOutput == false {
+            if hasInput == false {
+                return nil
+            }
+        }
+        var outputDataSource: UInt32?
+        var canSetVolume = false
+        var hasHardwareMute = false
+        if hasOutput == true {
+            outputDataSource = self.coreAudio.readOutputDataSource(of: deviceID)
+            canSetVolume = self.coreAudio.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID)
+            hasHardwareMute = self.coreAudio.isSettable(CoreAudioProperty.muteAddress, of: deviceID)
+        }
         return AudioDeviceInfo(
-            uid: uid, name: name, transport: .init(coreAudioTransportType: CoreAudioProperty.readTransportType(of: deviceID)),
-            modelUID: try? CoreAudioProperty.readString(kAudioDevicePropertyModelUID, of: deviceID),
-            outputDataSource: hasOutput ? CoreAudioProperty.readOutputDataSource(of: deviceID) : nil, hasOutput: hasOutput, hasInput: hasInput,
-            canSetVolume: hasOutput && CoreAudioProperty.isSettable(CoreAudioProperty.virtualMainVolumeAddress, of: deviceID),
-            hasHardwareMute: hasOutput && CoreAudioProperty.isSettable(CoreAudioProperty.muteAddress, of: deviceID))
+            uid: names.uid, name: names.name,
+            transport: AudioDeviceInfo.Transport(coreAudioTransportType: self.coreAudio.readTransportType(of: deviceID)),
+            modelUID: try? self.coreAudio.readString(kAudioDevicePropertyModelUID, of: deviceID), outputDataSource: outputDataSource,
+            hasOutput: hasOutput, hasInput: hasInput, canSetVolume: canSetVolume, hasHardwareMute: hasHardwareMute)
+    }
+
+    private func readNames(of deviceID: AudioObjectID) -> (uid: String, name: String)? {
+        guard let uid = try? self.coreAudio.readString(kAudioDevicePropertyDeviceUID, of: deviceID) else {
+            return nil
+        }
+        guard let name = try? self.coreAudio.readString(kAudioObjectPropertyName, of: deviceID) else {
+            return nil
+        }
+        return (uid: uid, name: name)
     }
 }

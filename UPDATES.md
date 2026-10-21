@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.8, review 4.1 to 4.3: Core Audio seam and audio adapter tests)
+
+- `CoreAudioAccess` (protocol) with `CoreAudioHAL` (forwards to `CoreAudioProperty` and the listener block calls) is injected into `AudioOutput`, `AudioDeviceList` and `InputDeviceKeeper`; `AudioOutput` also takes `SoftwareVolumeControlling` (`SoftwareVolume` conforms), a `now` closure and a `sleep` closure. The defaults keep every call site unchanged. Reason: `Docs/CODE_REVIEW.md` §4.3; the audio adapters carry real logic that had no unit test because the HAL was a static hidden dependency.
+- new fixtures `FakeCoreAudio`, `FakeSoftwareVolume` and `TestClock` (moved out of `DialControllerTests`), and the suites `AudioOutputTests`, `AudioDeviceListTests` and `InputDeviceKeeperTests`; DESIGN.md §7.4 and §11.1 describe the seam and the coverage.
+- the three rewritten adapters already follow the swift-coding-conventions skill (explicit `self.`, `== true/false`, explicit `return`, `-> Void`, one condition per guard, guards first), so the sweep in 3.3 covers only the remaining audio files. `AudioDeviceList.describe` reads the names before the streams, which only changes the order of two reads.
+- version bump: 1.2.7 to 1.2.8 (PATCH - internal seam, no user-visible change)
+
 ### 2026-10-22 (v1.2.7, review 2.4: tests grouped like the sources)
 
 - the test suites moved from one flat folder into `Audio/`, `Control/`, `Dial/`, `Support/` and `UI/` under `Tests/FeelTheNoizeTests`, each next to the production file it covers, with the shared fixtures in `Fixtures/`; `git mv` only, no content change. Reason: decided by the developer (`Docs/CODE_REVIEW.md` Decisions); XcodeGen includes the folders from the source path, so `project.yml` is unchanged.

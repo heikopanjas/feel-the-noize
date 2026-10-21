@@ -58,14 +58,6 @@ struct DialControllerTests {
         }
     }
 
-    private final class TestClock {
-        var now = ContinuousClock.now
-
-        func advance(by duration: Duration) {
-            now += duration
-        }
-    }
-
     private struct Fixture {
         let audio: FakeAudio
         let haptics = FakeHaptics()

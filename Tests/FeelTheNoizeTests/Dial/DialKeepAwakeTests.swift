@@ -78,8 +78,7 @@ struct DialKeepAwakeTests {
         await sleeper.waitUntilAsleep()
 
         keepAwake.stop()
-        sleeper.release()
-        await Task.yield()
+        await sleeper.releaseAndWait()
         #expect(sendCount == 0)
         #expect(keepAwake.isRunning == false)
     }

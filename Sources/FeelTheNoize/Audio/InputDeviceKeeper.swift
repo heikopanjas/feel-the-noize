@@ -6,33 +6,43 @@ import CoreAudio
 /// Listeners are registered only while a device is kept, so a keep that is off adds no work.
 final class InputDeviceKeeper {
     private static let observedAddresses = [CoreAudioProperty.devicesAddress, CoreAudioProperty.defaultInputDeviceAddress]
+    private static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
     /// Core Audio UID of the kept device; `nil` turns the keep off.
     var keptUID: String? {
         didSet {
-            guard keptUID != oldValue else { return }
-            if keptUID == nil {
-                stop()
+            guard self.keptUID != oldValue else {
+                return
+            }
+            if self.keptUID == nil {
+                self.stop()
             }
             else {
-                start()
-                enforce()
+                self.start()
+                self.enforce()
             }
         }
     }
 
+    private let coreAudio: any CoreAudioAccess
     private var listener: CoreAudioProperty.ListenerBlock?
 
-    private func start() {
-        guard listener == nil else { return }
+    init(coreAudio: any CoreAudioAccess = CoreAudioHAL()) {
+        self.coreAudio = coreAudio
+    }
+
+    private func start() -> Void {
+        guard self.listener == nil else {
+            return
+        }
         let listener: CoreAudioProperty.ListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
                 self?.enforce()
             }
         }
         self.listener = listener
-        for var address in Self.observedAddresses {
-            let status = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+        for address in Self.observedAddresses {
+            let status = self.coreAudio.addListener(listener, for: address, on: Self.systemObject)
             if status != noErr {
                 Log.audio.error("\(CoreAudioError(status: status, operation: "Observing the default input"), privacy: .public)")
             }
@@ -40,29 +50,41 @@ final class InputDeviceKeeper {
         Log.audio.info("Keeping input device \(self.keptUID ?? "", privacy: .public)")
     }
 
-    private func stop() {
-        guard let listener else { return }
-        for var address in Self.observedAddresses {
-            AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+    private func stop() -> Void {
+        guard let listener = self.listener else {
+            return
+        }
+        for address in Self.observedAddresses {
+            self.coreAudio.removeListener(listener, for: address, on: Self.systemObject)
         }
         self.listener = nil
         Log.audio.info("Stopped keeping an input device")
     }
 
-    /// A disconnected kept device is left alone: macOS picks another input, and the device list notification of the
-    /// reconnect switches back.
-    private func enforce() {
-        guard let keptUID else { return }
+    private func enforce() -> Void {
+        guard let keptUID = self.keptUID else {
+            return
+        }
         do {
-            guard let keptID = try CoreAudioProperty.readDevice(uid: keptUID) else { return }
-            let currentID = try CoreAudioProperty.readDefaultDevice(scope: kAudioDevicePropertyScopeInput)
-            guard currentID != keptID else { return }
-            try CoreAudioProperty.writeDefaultDevice(keptID, scope: kAudioDevicePropertyScopeInput)
-            let replaced = currentID.flatMap { try? CoreAudioProperty.readString(kAudioObjectPropertyName, of: $0) } ?? "none"
-            Log.audio.notice("Switched the input back to \(keptUID, privacy: .public) from \(replaced, privacy: .public)")
+            try self.switchBack(to: keptUID)
         }
         catch {
             Log.audio.error("\(error, privacy: .public)")
         }
+    }
+
+    /// A disconnected kept device is left alone: macOS picks another input, and the device list notification of the
+    /// reconnect switches back.
+    private func switchBack(to keptUID: String) throws -> Void {
+        guard let keptID = try self.coreAudio.readDevice(uid: keptUID) else {
+            return
+        }
+        let currentID = try self.coreAudio.readDefaultDevice(scope: kAudioDevicePropertyScopeInput)
+        if currentID == keptID {
+            return
+        }
+        try self.coreAudio.writeDefaultDevice(keptID, scope: kAudioDevicePropertyScopeInput)
+        let replaced = currentID.flatMap { try? self.coreAudio.readString(kAudioObjectPropertyName, of: $0) } ?? "none"
+        Log.audio.notice("Switched the input back to \(keptUID, privacy: .public) from \(replaced, privacy: .public)")
     }
 }

@@ -7,7 +7,7 @@ import Synchronization
 /// A process tap takes the audio other apps send to the device and keeps it from reaching the hardware. A private
 /// aggregate device made of that tap and the device plays it into the device again, scaled by the gain. The IO block is
 /// the only code in the app that runs off the main actor; it shares the gain through atomics, without locks.
-final class SoftwareVolume {
+final class SoftwareVolume: SoftwareVolumeControlling {
     static let aggregateUIDPrefix = "com.panjas.FeelTheNoize.software-volume."
 
     /// The device being controlled, or `nil` while stopped.
