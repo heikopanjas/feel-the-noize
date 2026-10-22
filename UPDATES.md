@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.18, battery symbol per AirPods part, wider menu)
+
+- AirPods rows show a battery symbol after each part, "L 80 %", "R 75 %" and "case 40 %" separated by an em space, instead of the text-only "L 80 %, R 75 %, case 40 %". `BatteryIcon.attributedText(_:)` takes the text and level of each part, `AccessoryBattery.Cell.text` gives the per-part text, and `AccessoryBattery.singleLevel` is removed as unused; the accessibility label keeps the joined text. Reason: requested by the developer for consistency with the single-cell rows, which already showed the symbol.
+- the menu is 360 pt wide instead of 240 pt (`StatusItemController.menuWidth`, the width of the volume slider row), so a device name with three battery parts fits on one line; a wider row still widens the menu. Reason: requested by the developer, 50 % wider.
+- tests: `BatteryIconTests` checks one symbol per part and no text without parts, `AccessoryBatteryTests` checks the cells instead of `singleLevel`. DESIGN.md §5.3, §7.12 and §11.1 updated.
+- version bump: 1.2.17 to 1.2.18 (PATCH - presentation change of an existing feature)
+
 ### 2026-10-22 (v1.2.17, review branch: first compile)
 
 - first build of the review branch on a Mac. Two fixes: the listener parameter of `CoreAudioAccess.addListener` and `removeListener` is `@escaping` (in `CoreAudioHAL` and `FakeCoreAudio` as well), since Core Audio and the fake keep the block; `FakeCoreAudio` and `AudioOutputTests` import AudioToolbox, which declares `kAudioHardwareServiceDeviceProperty_VirtualMainVolume`. App and test target now compile. The warning in `CoreAudioProperty.readDevice`, which predates the review, is gone too: the UID qualifier is passed through `withUnsafePointer(to:)` instead of an implicit `&uid`, which states that the pointer is to the CFString reference and keeps it alive for the call. The clean build of app and tests has no compiler warnings. `DialKeepAwakeTests` passes both closures of `DialKeepAwake.init` with labels, for the `OnlyOneTrailingClosureArgument` lint rule. `./build.sh lint` is clean and all 143 tests in 21 suites pass, none hanging. Reason: `Docs/CODE_REVIEW.md` status, step 1.

@@ -39,6 +39,20 @@ struct AccessoryBattery: Equatable {
     struct Cell: Equatable {
         let part: Part
         let level: Int
+
+        /// "L 80 %", "R 75 %", "case 40 %", or "80 %" for a single cell; the menu shows a battery symbol after each.
+        var text: String {
+            switch self.part {
+                case .left:
+                    return "L \(self.level) %"
+                case .right:
+                    return "R \(self.level) %"
+                case .chargingCase:
+                    return "case \(self.level) %"
+                case .single:
+                    return "\(self.level) %"
+            }
+        }
     }
 
     /// One read of the power sources.
@@ -60,36 +74,9 @@ struct AccessoryBattery: Equatable {
     private static let dialVendorID = 1118
     private static let dialProductID = 2331
 
-    /// The level of a single-cell device, which the menu shows with a battery symbol.
-    var singleLevel: Int? {
-        guard self.cells.count == 1 else {
-            return nil
-        }
-        guard let cell = self.cells.first else {
-            return nil
-        }
-        guard cell.part == .single else {
-            return nil
-        }
-        return cell.level
-    }
-
-    /// "80 %" for a single cell, "L 80 %, R 75 %, case 40 %" for AirPods.
+    /// "80 %" for a single cell, "L 80 %, R 75 %, case 40 %" for AirPods; the accessibility label of the menu row.
     var text: String {
-        return self.cells.map(Self.text(for:)).joined(separator: ", ")
-    }
-
-    private static func text(for cell: Cell) -> String {
-        switch cell.part {
-            case .left:
-                return "L \(cell.level) %"
-            case .right:
-                return "R \(cell.level) %"
-            case .chargingCase:
-                return "case \(cell.level) %"
-            case .single:
-                return "\(cell.level) %"
-        }
+        return self.cells.map(\.text).joined(separator: ", ")
     }
 
     // MARK: - Reading

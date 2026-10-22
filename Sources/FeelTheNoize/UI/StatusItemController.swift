@@ -7,8 +7,9 @@ import AppKit
 final class StatusItemController: NSObject, NSMenuDelegate {
     private static let inputMonitoringSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
     private static let iconSize: CGFloat = 18
-    /// The slider lines up with the section headers; AppKit widens the row to the menu.
-    private static let sliderRowWidth: CGFloat = 240
+    /// The menu's width, set through the slider row; a wider row, such as a long device name with three batteries, widens
+    /// the menu, and AppKit widens the slider row with it. The slider lines up with the section headers.
+    private static let menuWidth: CGFloat = 360
     private static let sliderInset = MenuInfoRow.inset
     private static let sliderVerticalPadding: CGFloat = 5
 
@@ -125,10 +126,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     private func buildSliderItem() -> Void {
         let sliderHeight = VolumeSlider.trackHeight
-        let row = NSView(frame: NSRect(x: 0, y: 0, width: Self.sliderRowWidth, height: sliderHeight + 2 * Self.sliderVerticalPadding))
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: Self.menuWidth, height: sliderHeight + 2 * Self.sliderVerticalPadding))
         row.autoresizingMask = [.width]
         self.volumeSlider.frame = NSRect(
-            x: Self.sliderInset, y: Self.sliderVerticalPadding, width: Self.sliderRowWidth - 2 * Self.sliderInset, height: sliderHeight)
+            x: Self.sliderInset, y: Self.sliderVerticalPadding, width: Self.menuWidth - 2 * Self.sliderInset, height: sliderHeight)
         self.volumeSlider.autoresizingMask = [.width]
         self.volumeSlider.target = self
         self.volumeSlider.action = #selector(self.volumeSliderChanged(_:))
@@ -290,9 +291,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let icon = DeviceIcon.image(
             symbolName: DeviceIcon.symbolName(for: device, direction: direction), isDefault: isDefault, accessibilityDescription: nil)
         let description = [device.name, isDefault == true ? current : nil, battery.map { "battery \($0.text)" }].compactMap(\.self)
+        let cells = battery?.cells.map { (text: $0.text, level: $0.level) } ?? []
         item.view = MenuDeviceRow(
-            name: device.name, isDefault: isDefault, icon: icon, battery: battery.map { ($0.text, $0.singleLevel) },
-            accessibilityLabel: description.joined(separator: ", "))
+            name: device.name, isDefault: isDefault, icon: icon, battery: cells, accessibilityLabel: description.joined(separator: ", "))
         return item
     }
 

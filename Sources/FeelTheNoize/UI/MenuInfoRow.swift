@@ -55,7 +55,7 @@ final class MenuInfoRow: NSView {
     private func updateBattery() -> Void {
         self.batteryLabel.isHidden = self.batteryLevel == nil
         if let batteryLevel = self.batteryLevel {
-            self.batteryLabel.attributedStringValue = BatteryIcon.attributedText("\(batteryLevel) %", level: batteryLevel)
+            self.batteryLabel.attributedStringValue = BatteryIcon.attributedText([(text: "\(batteryLevel) %", level: batteryLevel)])
         }
     }
 

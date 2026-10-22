@@ -25,18 +25,20 @@ nonisolated enum BatteryIcon {
         return max(CGFloat(clamped) / 100, 0.08)
     }
 
-    /// The battery text of the menu rows in the small menu font: "85 %" followed by the symbol for a single cell, or text
-    /// such as "L 80 %, R 75 %, case 40 %" alone. Dial and device rows share it, so they look the same.
-    static func attributedText(_ text: String, level: Int?) -> NSAttributedString {
+    /// The battery text of the menu rows in the small menu font: each cell's text followed by its symbol, such as "85 %" with
+    /// one symbol or "L 80 %", "R 75 %" and "case 40 %" with three. Dial and device rows share it, so they look the same.
+    static func attributedText(_ cells: [(text: String, level: Int)]) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
-        let result = NSMutableAttributedString(string: text, attributes: attributes)
-        if let level = level {
+        let result = NSMutableAttributedString()
+        for (index, cell) in cells.enumerated() {
+            // An em space between cells keeps each symbol visibly with its own text, an en space within a cell.
+            let separator = index == 0 ? "" : "\u{2003}"
+            result.append(NSAttributedString(string: separator + cell.text + "\u{2002}", attributes: attributes))
             let attachment = NSTextAttachment()
-            attachment.image = Self.image(level: level, accessibilityDescription: "battery")
+            attachment.image = Self.image(level: cell.level, accessibilityDescription: "battery")
             // Centers the symbol on the digits instead of sitting on the baseline.
             attachment.bounds = NSRect(origin: NSPoint(x: 0, y: (font.capHeight - Self.size.height) / 2), size: Self.size)
-            result.append(NSAttributedString(string: "\u{2002}", attributes: attributes))
             result.append(NSAttributedString(attachment: attachment))
         }
         return result

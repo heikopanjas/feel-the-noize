@@ -22,12 +22,23 @@ struct BatteryIconTests {
         #expect(inked.count > 20)
     }
 
-    @Test func textWithSymbolForSingleCellOnly() -> Void {
-        let single = BatteryIcon.attributedText("96 %", level: 96)
-        #expect(single.string.hasPrefix("96 %") == true)
-        #expect(single.containsAttachments(in: NSRange(location: 0, length: single.length)) == true)
-        let parts = BatteryIcon.attributedText("L 80 %, R 75 %", level: nil)
-        #expect(parts.string == "L 80 %, R 75 %")
-        #expect(parts.containsAttachments(in: NSRange(location: 0, length: parts.length)) == false)
+    @Test("Each cell's text is followed by its own symbol", arguments: [1, 3])
+    func textWithSymbolPerCell(count: Int) -> Void {
+        let cells = [(text: "L 80 %", level: 80), (text: "R 75 %", level: 75), (text: "case 40 %", level: 40)].prefix(count)
+        let text = BatteryIcon.attributedText(Array(cells))
+        var symbolCount = 0
+        text.enumerateAttribute(.attachment, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+            if value != nil {
+                symbolCount += 1
+            }
+        }
+        #expect(symbolCount == count)
+        for cell in cells {
+            #expect(text.string.contains(cell.text + "\u{2002}") == true)
+        }
+    }
+
+    @Test func noTextWithoutCells() -> Void {
+        #expect(BatteryIcon.attributedText([]).length == 0)
     }
 }

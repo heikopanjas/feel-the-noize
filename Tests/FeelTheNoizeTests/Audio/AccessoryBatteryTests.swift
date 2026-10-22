@@ -26,7 +26,7 @@ struct AccessoryBatteryTests {
         ])
         let battery = try #require(batteries["70F94AA8CEBF"])
         #expect(battery.text == "96 %")
-        #expect(battery.singleLevel == 96)
+        #expect(battery.cells == [AccessoryBattery.Cell(part: .single, level: 96)])
     }
 
     @Test func airPodsPartsAreGroupedAndOrdered() throws -> Void {
@@ -38,7 +38,7 @@ struct AccessoryBatteryTests {
         ])
         let battery = try #require(batteries["AABBCCDDEEFF"])
         #expect(battery.text == "L 80 %, R 75 %, case 40 %")
-        #expect(battery.singleLevel == nil)
+        #expect(battery.cells.map(\.text) == ["L 80 %", "R 75 %", "case 40 %"])
     }
 
     @Test func sourcesWithoutAddressOrLevelAreSkipped() -> Void {
@@ -62,7 +62,7 @@ struct AccessoryBatteryTests {
         let batteries = AccessoryBattery.batteries(from: [
             ["Accessory Identifier": "AA:BB:CC:DD:EE:FF", "Part Identifier": "Single", "Current Capacity": 140]
         ])
-        #expect(try #require(batteries["AABBCCDDEEFF"]).singleLevel == 100)
+        #expect(try #require(batteries["AABBCCDDEEFF"]).cells.map(\.level) == [100])
     }
 
     @Test func dialFoundByVendorAndProduct() -> Void {

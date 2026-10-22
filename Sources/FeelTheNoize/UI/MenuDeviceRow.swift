@@ -17,8 +17,8 @@ final class MenuDeviceRow: NSView {
     private let nameLabel = NSTextField(labelWithString: "")
     private let batteryLabel = NSTextField(labelWithString: "")
 
-    /// `battery` is the text and, for a single cell, the level that adds the battery symbol.
-    init(name: String, isDefault: Bool, icon: NSImage, battery: (text: String, level: Int?)?, accessibilityLabel: String) {
+    /// `battery` holds the text and level of each cell, each shown with a battery symbol; empty without a battery.
+    init(name: String, isDefault: Bool, icon: NSImage, battery: [(text: String, level: Int)], accessibilityLabel: String) {
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Self.height))
         self.autoresizingMask = [.width]
 
@@ -28,10 +28,8 @@ final class MenuDeviceRow: NSView {
         let fontSize = NSFont.menuFont(ofSize: 0).pointSize
         self.nameLabel.font = isDefault == true ? .boldSystemFont(ofSize: fontSize) : .menuFont(ofSize: fontSize)
         self.nameLabel.lineBreakMode = .byTruncatingTail
-        if let battery = battery {
-            self.batteryLabel.attributedStringValue = BatteryIcon.attributedText(battery.text, level: battery.level)
-        }
-        self.batteryLabel.isHidden = battery == nil
+        self.batteryLabel.attributedStringValue = BatteryIcon.attributedText(battery)
+        self.batteryLabel.isHidden = battery.isEmpty == true
         for subview in [self.iconView, self.nameLabel, self.batteryLabel] {
             subview.setAccessibilityElement(false)
             self.addSubview(subview)
@@ -39,7 +37,7 @@ final class MenuDeviceRow: NSView {
         self.setAccessibilityElement(true)
         self.setAccessibilityRole(.menuItem)
         self.setAccessibilityLabel(accessibilityLabel)
-        self.layoutRow(hasBattery: battery != nil)
+        self.layoutRow(hasBattery: battery.isEmpty == false)
     }
 
     required init?(coder: NSCoder) {

@@ -156,7 +156,7 @@ Volume: 42 %                       (disabled info item)
 Volume                             (section header)
 [🎧━━━━━━━●──────────]             (volume slider)
 Output                             (section header)
-(●) **AirPods Pro**                (accent circle and bold: default output)
+(●) **AirPods Pro**   L 99 % ▭  R 100 % ▭  (accent circle and bold: default output; battery per part)
 (○) MacBook Pro Speakers           (gray circle)
 (○) MOTU M2
 Input                              (section header)
@@ -172,7 +172,7 @@ About Feel the Noize
 Quit Feel the Noize                ⌘Q
 ```
 
-Device items carry the battery level at the right edge, in the same small font and the same column as the Dial row's battery: "96 %" with the battery symbol for a single-cell device such as AirPods Max, "L 80 %, R 75 %, case 40 %" for AirPods with separate parts (§7.12). Requested by the developer 2026-10-21 after a first version placed it in the regular menu font at a tab stop. Each device item is therefore a `MenuDeviceRow` (`UI/MenuDeviceRow.swift`), a custom item view with the 14 pt inset of the status rows: the `DeviceIcon` circle, the name in the menu font (bold for the default), and the battery from `BatteryIcon.attributedText(_:level:)`, which the Dial row uses as well. As a view-based item it draws its own highlight, a rounded gray background inset 5 pt like the macOS Sound menu, performs the item's action on mouse up after `cancelTracking()`, and exposes one accessibility element with role menu item and a label such as "AirPods Max, current output, battery 96 %".
+Device items carry the battery level at the right edge, in the same small font and the same column as the Dial row's battery: "96 %" with the battery symbol for a single-cell device such as AirPods Max, "L 80 %", "R 75 %" and "case 40 %", each with its own battery symbol, for AirPods with separate parts (§7.12). Requested by the developer 2026-10-21 after a first version placed it in the regular menu font at a tab stop; the symbol per part replaced a text-only "L 80 %, R 75 %, case 40 %" at the developer's request 2026-10-22, for consistency with the single-cell rows. Each device item is therefore a `MenuDeviceRow` (`UI/MenuDeviceRow.swift`), a custom item view with the 14 pt inset of the status rows: the `DeviceIcon` circle, the name in the menu font (bold for the default), and the battery from `BatteryIcon.attributedText(_:)`, which takes the text and level of each part and which the Dial row uses as well. The menu is 360 pt wide, set through the width of the volume slider row and widened by 50 % from 240 pt at the developer's request 2026-10-22, so the name and three battery parts fit on one line; a row that needs more, such as a long name with three parts, widens the menu further, since rows report their natural width and never wrap. As a view-based item it draws its own highlight, a rounded gray background inset 5 pt like the macOS Sound menu, performs the item's action on mouse up after `cancelTracking()`, and exposes one accessibility element with role menu item and a label such as "AirPods Max, current output, battery 96 %".
 
 The Input line appends "(kept)" when the default input is the kept device (§7.13).
 
@@ -620,7 +620,7 @@ AirPods and most Classic Bluetooth headphones do not offer the Bluetooth Battery
 
 **Matching.** A battery belongs to the Core Audio device whose UID carries the same Bluetooth address: `AccessoryBattery.address(in:)` finds six hex pairs separated by `-` or `:` and compares them as twelve uppercase hex digits. Verified for AirPods Max on 2026-10-21: Core Audio UIDs `70-F9-4A-A8-CE-BF:output` and `…:input`, power source `70:F9:4A:A8:CE:BF` (R10). Both Core Audio devices match, so the level shows in both sections.
 
-**Text.** AirPods: "L 80 %, R 75 %, case 40 %"; parts that report nothing are left out (the case reports only while it is open). Single-cell devices: "80 %" followed by the `BatteryIcon` symbol of the Dial row (§5.3). No battery, no text. `MenuDeviceRow` places it at the right edge in the column of the Dial row's battery.
+**Text.** Each part shows its text followed by the `BatteryIcon` symbol of the Dial row (§5.3): AirPods "L 80 %", "R 75 %" and "case 40 %", separated by an em space; single-cell devices "80 %". Parts that report nothing are left out (the case reports only while it is open). No battery, no text. The accessibility label keeps the joined text "L 80 %, R 75 %, case 40 %" (`AccessoryBattery.text`). `MenuDeviceRow` places it at the right edge in the column of the Dial row's battery.
 
 **Dial.** The Surface Dial is among the accessory sources, so it replaced `DialBattery` (§7.10).
 
@@ -787,7 +787,7 @@ The test target inherits `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` from the ba
 | `SoftwareGainTests` | silence at 0, unity at 1, decibel values at sample points, monotonic law |
 | `DeviceIconTests` | slider symbol for headphones, speakers and no output; symbol per transport, direction, built-in name and data source, and Apple product ID; product ID parsing; every chosen symbol exists; circle image size, non-template, accessibility description, transparent corners |
 | `KnobIconTests` | pointer angle over the 270° sweep with clamping, template image size and description, every style draws in both states |
-| `BatteryIconTests` | fill fraction clamped with a sliver for any charge, image size, accessibility description and ink at a low and a high level; battery text with the symbol for a single cell only |
+| `BatteryIconTests` | fill fraction clamped with a sliver for any charge, image size, accessibility description and ink at a low and a high level; battery text with one symbol per part, none without parts |
 | `StatusItemTitleTests` | Dial status line for each connection state; Input line with and without a device and with "(kept)"; device sections split by direction and sorted by name, a device with both directions in both |
 | `DialControllerTests` | gesture rules 1–4 with fake `AudioControlling` / `HapticFeedback` and an injected clock: short press toggles mute; press+turn steps by quarter and does not toggle; turn while muted unmutes; end stop fires and is rate-limited; reverse direction; `canSetVolume == false` ignores rotation; `reset()` mid-press; excluded device ignores rotation, press and end stop; press-and-turn on an excluded device still suppresses the mute toggle; rotation on a device without volume control buzzes once per gesture; rotation on an output owned by another device probes and buzzes once per gesture |
 
