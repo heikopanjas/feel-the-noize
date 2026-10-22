@@ -38,14 +38,27 @@ struct StatusItemTitleTests {
         #expect(sections.inputs.map(\.name) == ["AirPods Pro", "MacBook Pro Microphone", "MOTU M2"])
     }
 
+    @Test("Input rows leave out the batteries of devices that are outputs as well")
+    func batteryAddressesOfOutputs() -> Void {
+        let outputs = [
+            Self.device("AirPods Pro", uid: "70-F9-4A-A8-CE-BF:output", output: true, input: false),
+            Self.device("MOTU M2", uid: "AppleUSBAudioEngine:MOTU:M2:M2MA1307XA:1,2", output: true, input: true)
+        ]
+        let hidden = StatusItemController.batteryAddresses(of: outputs)
+        #expect(hidden == ["70F94AA8CEBF"])
+        #expect(hidden.contains(AccessoryBattery.address(in: "70-F9-4A-A8-CE-BF:input") ?? "") == true)
+        #expect(hidden.contains(AccessoryBattery.address(in: "11-22-33-44-55-66:input") ?? "") == false)
+    }
+
     @Test func muteTitleFollowsTheState() -> Void {
         #expect(MenuMuteRow.title(isMuted: false) == "Mute")
         #expect(MenuMuteRow.title(isMuted: true) == "Unmute")
     }
 
-    private static func device(_ name: String, output: Bool, input: Bool) -> AudioDeviceInfo {
+    /// `uid` defaults to the name, which carries no Bluetooth address.
+    private static func device(_ name: String, uid: String? = nil, output: Bool, input: Bool) -> AudioDeviceInfo {
         return AudioDeviceInfo(
-            uid: name, name: name, transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: output, hasInput: input, canSetVolume: output,
-            hasHardwareMute: false)
+            uid: uid ?? name, name: name, transport: .usb, modelUID: nil, outputDataSource: nil, hasOutput: output, hasInput: input,
+            canSetVolume: output, hasHardwareMute: false)
     }
 }

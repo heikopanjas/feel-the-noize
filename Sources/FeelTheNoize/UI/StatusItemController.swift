@@ -231,9 +231,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.removeItem(item)
         }
         let sections = Self.deviceSections(self.deviceList.devices)
+        let outputAddresses = Self.batteryAddresses(of: sections.outputs)
         self.deviceItems =
-            self.sectionItems(.output, devices: sections.outputs, defaultUID: self.deviceList.defaultOutputUID)
-            + self.sectionItems(.input, devices: sections.inputs, defaultUID: self.deviceList.defaultInputUID)
+            self.sectionItems(.output, devices: sections.outputs, defaultUID: self.deviceList.defaultOutputUID, hiddenBatteries: [])
+            + self.sectionItems(.input, devices: sections.inputs, defaultUID: self.deviceList.defaultInputUID, hiddenBatteries: outputAddresses)
         let start = menu.index(of: self.sliderItem) + 1
         for (offset, item) in self.deviceItems.enumerated() {
             menu.insertItem(item, at: start + offset)
@@ -257,8 +258,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     /// A section without devices is left out entirely. As in the macOS Sound menu, the default device is marked by the accent
-    /// circle of its icon, and its name is bold. The title stays set for type-to-select; the row view draws the item.
-    private func sectionItems(_ direction: DeviceIcon.Direction, devices: [AudioDeviceInfo], defaultUID: String?) -> [NSMenuItem] {
+    /// circle of its icon, and its name is bold. The title stays set for type-to-select; the row view draws the item. Devices
+    /// whose Bluetooth address is in `hiddenBatteries` show no battery.
+    private func sectionItems(
+        _ direction: DeviceIcon.Direction, devices: [AudioDeviceInfo], defaultUID: String?, hiddenBatteries: Set<String>
+    ) -> [NSMenuItem] {
         guard devices.isEmpty == false else {
             return []
         }
@@ -276,18 +280,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 current = "current input"
         }
         let items = devices.map { device in
-            return self.menuItem(for: device, direction: direction, action: action, isDefault: device.uid == defaultUID, current: current)
+            return self.menuItem(
+                for: device, direction: direction, action: action, isDefault: device.uid == defaultUID, current: current,
+                battery: self.battery(for: device, hiding: hiddenBatteries))
         }
         return [.sectionHeader(title: title)] + items
     }
 
     private func menuItem(
-        for device: AudioDeviceInfo, direction: DeviceIcon.Direction, action: Selector, isDefault: Bool, current: String
+        for device: AudioDeviceInfo, direction: DeviceIcon.Direction, action: Selector, isDefault: Bool, current: String,
+        battery: AccessoryBattery?
     ) -> NSMenuItem {
         let item = NSMenuItem(title: device.name, action: action, keyEquivalent: "")
         item.target = self
         item.representedObject = device.uid
-        let battery = self.battery(for: device)
         let icon = DeviceIcon.image(
             symbolName: DeviceIcon.symbolName(for: device, direction: direction), isDefault: isDefault, accessibilityDescription: nil)
         let description = [device.name, isDefault == true ? current : nil, battery.map { "battery \($0.text)" }].compactMap(\.self)
@@ -297,9 +303,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return item
     }
 
-    /// A device with output and input, such as AirPods, shows the same battery in both sections.
-    private func battery(for device: AudioDeviceInfo) -> AccessoryBattery? {
-        return AccessoryBattery.address(in: device.uid).flatMap { self.batteries.devices[$0] }
+    private func battery(for device: AudioDeviceInfo, hiding hiddenAddresses: Set<String>) -> AccessoryBattery? {
+        guard let address = AccessoryBattery.address(in: device.uid) else {
+            return nil
+        }
+        guard hiddenAddresses.contains(address) == false else {
+            return nil
+        }
+        return self.batteries.devices[address]
+    }
+
+    /// The Bluetooth addresses of the outputs, whose batteries the Input section leaves out: a device with output and input
+    /// shows its battery once, under Output. AirPods list output and input as two Core Audio devices with one address.
+    static func batteryAddresses(of outputs: [AudioDeviceInfo]) -> Set<String> {
+        return Set(outputs.compactMap { AccessoryBattery.address(in: $0.uid) })
     }
 
     /// Both sections are sorted by name like the Devices tab; a device with output and input appears in both.

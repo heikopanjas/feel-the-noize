@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.19, battery once per device in the menu)
+
+- a device with output and input shows its battery only in the Output section. The match is by Bluetooth address, since AirPods list output and input as two Core Audio devices with one address: `StatusItemController.batteryAddresses(of:)` collects the addresses of the outputs once per rebuild, and an input row with one of them shows no battery and has none in its accessibility label. An input-only Bluetooth device keeps its battery. `StatusItemTitleTests` covers the addresses; DESIGN.md §7.12, §11.1 and checklist item 16 updated. Reason: requested by the developer, the same levels twice add nothing.
+- version bump: 1.2.18 to 1.2.19 (PATCH - presentation change of an existing feature)
+
 ### 2026-10-22 (v1.2.18, battery symbol per AirPods part, wider menu)
 
 - AirPods rows show a battery symbol after each part, "L 80 %", "R 75 %" and "case 40 %" separated by an em space, instead of the text-only "L 80 %, R 75 %, case 40 %". `BatteryIcon.attributedText(_:)` takes the text and level of each part, `AccessoryBattery.Cell.text` gives the per-part text, and `AccessoryBattery.singleLevel` is removed as unused; the accessibility label keeps the joined text. Reason: requested by the developer for consistency with the single-cell rows, which already showed the symbol.
