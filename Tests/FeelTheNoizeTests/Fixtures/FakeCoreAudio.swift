@@ -1,3 +1,4 @@
+import AudioToolbox
 import CoreAudio
 
 @testable import FeelTheNoize
@@ -164,14 +165,14 @@ final class FakeCoreAudio: CoreAudioAccess {
     }
 
     func addListener(
-        _ listener: CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
+        _ listener: @escaping CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
     ) -> OSStatus {
         self.listeners.append((objectID: objectID, selector: address.mSelector, block: listener))
         return noErr
     }
 
     func removeListener(
-        _ listener: CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
+        _ listener: @escaping CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
     ) -> Void {
         // The HAL identifies a listener by its block; so does this fake.
         let identity = ObjectIdentifier(listener as AnyObject)

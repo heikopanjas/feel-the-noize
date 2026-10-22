@@ -51,7 +51,7 @@ struct DialKeepAwakeTests {
     @Test func sendsAfterEachIntervalAndNotAtStart() async -> Void {
         let sleeper = ManualSleeper()
         var sendCount = 0
-        let keepAwake = DialKeepAwake(sleep: { duration in await sleeper.sleep(for: duration) }) { sendCount += 1 }
+        let keepAwake = DialKeepAwake(sleep: { duration in await sleeper.sleep(for: duration) }, send: { sendCount += 1 })
         keepAwake.isEnabled = true
         keepAwake.isDialConnected = true
 
@@ -72,7 +72,7 @@ struct DialKeepAwakeTests {
     @Test func stopWhileAsleepSendsNothingMore() async -> Void {
         let sleeper = ManualSleeper()
         var sendCount = 0
-        let keepAwake = DialKeepAwake(sleep: { duration in await sleeper.sleep(for: duration) }) { sendCount += 1 }
+        let keepAwake = DialKeepAwake(sleep: { duration in await sleeper.sleep(for: duration) }, send: { sendCount += 1 })
         keepAwake.isEnabled = true
         keepAwake.isDialConnected = true
         await sleeper.waitUntilAsleep()

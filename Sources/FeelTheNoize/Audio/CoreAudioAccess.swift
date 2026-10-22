@@ -22,9 +22,9 @@ protocol CoreAudioAccess {
     /// Registers `listener` on the main queue; Core Audio identifies it by the block instance, so the same instance is
     /// passed to `removeListener`.
     func addListener(
-        _ listener: CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
+        _ listener: @escaping CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
     ) -> OSStatus
     func removeListener(
-        _ listener: CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
+        _ listener: @escaping CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
     ) -> Void
 }

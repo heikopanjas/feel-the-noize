@@ -4,6 +4,11 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.17, review branch: first compile)
+
+- first build of the review branch on a Mac. Two fixes: the listener parameter of `CoreAudioAccess.addListener` and `removeListener` is `@escaping` (in `CoreAudioHAL` and `FakeCoreAudio` as well), since Core Audio and the fake keep the block; `FakeCoreAudio` and `AudioOutputTests` import AudioToolbox, which declares `kAudioHardwareServiceDeviceProperty_VirtualMainVolume`. App and test target now compile. The warning in `CoreAudioProperty.readDevice`, which predates the review, is gone too: the UID qualifier is passed through `withUnsafePointer(to:)` instead of an implicit `&uid`, which states that the pointer is to the CFString reference and keeps it alive for the call. The clean build of app and tests has no compiler warnings. `DialKeepAwakeTests` passes both closures of `DialKeepAwake.init` with labels, for the `OnlyOneTrailingClosureArgument` lint rule. `./build.sh lint` is clean and all 143 tests in 21 suites pass, none hanging. Reason: `Docs/CODE_REVIEW.md` status, step 1.
+- version bump: 1.2.16 to 1.2.17 (PATCH - compile fixes)
+
 ### 2026-10-22 (v1.2.16, review 3.8: icon script without force unwraps)
 
 - `Scripts/render-icon.swift` replaces its nine `!` and `try!` with guards that end the script through `fail(_:)`, a message on stderr and exit code 1, so `./build.sh icon` fails loudly instead of crashing; the drawing calls, their order and their values are unchanged, so the rendered PNGs should be byte-identical (to be confirmed with `./build.sh icon` and `git status` on a Mac). Semicolons and multi-variable `let`s are split as the skill asks. Reason: `Docs/CODE_REVIEW.md` §2.7 and milestone 3.8.

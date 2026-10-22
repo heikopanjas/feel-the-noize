@@ -56,11 +56,13 @@ enum CoreAudioProperty {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslateUIDToDevice, mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain)
-        var uid = uid as CFString
         var deviceID = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        try AudioObjectGetPropertyData(Self.systemObject, &address, UInt32(MemoryLayout<CFString>.size), &uid, &size, &deviceID)
-            .throwIfError("Looking up a device by UID")
+        // The qualifier is the CFString reference itself; an explicit pointer to it states that, which `&uid` cannot.
+        let status = withUnsafePointer(to: uid as CFString) { qualifier in
+            return AudioObjectGetPropertyData(Self.systemObject, &address, UInt32(MemoryLayout<CFString>.size), qualifier, &size, &deviceID)
+        }
+        try status.throwIfError("Looking up a device by UID")
         return deviceID == kAudioObjectUnknown ? nil : deviceID
     }
 

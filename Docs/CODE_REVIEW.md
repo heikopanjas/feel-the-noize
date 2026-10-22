@@ -22,10 +22,10 @@ The fix plan (§5) orders the work so that behavior-affecting fixes land first i
 
 All milestones are implemented on branch `claude/kind-faraday-f47iwf`, one commit per milestone (`git log 0351e66..`), in the order 1 → 2 → 4 → 3. The version went from 1.2.0 to 1.2.16, one PATCH per code commit, and every milestone has an entry in UPDATES.md.
 
-**Nothing in this branch has been compiled, linted or run.** The container that executed the plan has no Swift toolchain. Before merging, on a Mac:
+The container that executed the plan had no Swift toolchain. Before merging, on a Mac:
 
-1. `./build.sh lint test` — the first run will surface any compile error or lint finding from the sweep; the convention rewrites in Phase 3 were done by hand on ~5 500 lines without a compiler, so expect a handful of small fixes (a missed `self.`, a label, an isolation diagnostic on a closure).
-2. Watch the new suites in particular: `AudioOutputTests`, `AudioDeviceListTests`, `InputDeviceKeeperTests`, `DelayedActionTests` and `DialKeepAwakeTests` rely on `ManualSleeper`'s continuation choreography (`Fixtures/ManualSleeper.swift`); if one hangs, the `.timeLimit` to add is `.minutes(1)` and the suspect is `releaseAndWait()`.
+1. Done in 1.2.17: `./build.sh lint test`. The first compile needed two fixes (an `@escaping` listener parameter, a missing AudioToolbox import in two test files) and the lint one (labeled closures in `DialKeepAwakeTests`); the build has no compiler warnings, lint is clean, and all 143 tests pass.
+2. Done in 1.2.17: no `ManualSleeper` suite hangs (`AudioOutputTests`, `AudioDeviceListTests`, `InputDeviceKeeperTests`, `DelayedActionTests`, `DialKeepAwakeTests`).
 3. `./build.sh icon && git status` — the icon script must reproduce byte-identical PNGs (milestone 3.8 changed only error handling).
 4. The manual checklist items named per milestone in §5, above all 2–5 (haptics through `DelayedAction`), 7 and 21 (rejected writes through the pure `readState`), 9 and 18 (keep-awake) and 14–17 (menu and kept input).
 

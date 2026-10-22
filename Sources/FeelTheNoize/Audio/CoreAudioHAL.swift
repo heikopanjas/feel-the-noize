@@ -59,14 +59,14 @@ struct CoreAudioHAL: CoreAudioAccess {
     }
 
     func addListener(
-        _ listener: CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
+        _ listener: @escaping CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
     ) -> OSStatus {
         var address = address
         return AudioObjectAddPropertyListenerBlock(objectID, &address, .main, listener)
     }
 
     func removeListener(
-        _ listener: CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
+        _ listener: @escaping CoreAudioProperty.ListenerBlock, for address: AudioObjectPropertyAddress, on objectID: AudioObjectID
     ) -> Void {
         var address = address
         AudioObjectRemovePropertyListenerBlock(objectID, &address, .main, listener)
