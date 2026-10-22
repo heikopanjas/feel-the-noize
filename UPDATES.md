@@ -4,6 +4,10 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.19, review: icon script verified)
+
+- `./build.sh icon` on a Mac exits 0 and rewrites all ten AppIcon PNGs byte-identical, so the error handling of milestone 3.8 left the drawing unchanged. `Docs/CODE_REVIEW.md` status step 3 marked done; only the manual hardware checklist remains. Reason: `Docs/CODE_REVIEW.md` status, step 3.
+
 ### 2026-10-22 (v1.2.19, battery once per device in the menu)
 
 - a device with output and input shows its battery only in the Output section. The match is by Bluetooth address, since AirPods list output and input as two Core Audio devices with one address: `StatusItemController.batteryAddresses(of:)` collects the addresses of the outputs once per rebuild, and an input row with one of them shows no battery and has none in its accessibility label. An input-only Bluetooth device keeps its battery. `StatusItemTitleTests` covers the addresses; DESIGN.md §7.12, §11.1 and checklist item 16 updated. Reason: requested by the developer, the same levels twice add nothing.
