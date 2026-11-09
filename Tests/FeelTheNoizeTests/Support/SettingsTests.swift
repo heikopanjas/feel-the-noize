@@ -4,22 +4,16 @@ import Testing
 @testable import FeelTheNoize
 
 struct SettingsTests {
-    /// Runs the body against a private defaults domain, so nothing touches the app's real preferences. The registration
+    /// Runs the body against a temporary defaults domain, so nothing touches the app's real preferences. The registration
     /// domain is shared by every `UserDefaults` in the process, so `Settings.init` registers its defaults for `.standard`
     /// as well; that is harmless here, because the test host never installs `AppDelegate`.
-    private func withSettings(_ body: (Settings, UserDefaults) -> Void) -> Void {
-        let suiteName = "com.panjas.FeelTheNoizeTests.\(UUID().uuidString)"
-        if let defaults = UserDefaults(suiteName: suiteName) {
-            defer { defaults.removePersistentDomain(forName: suiteName) }
-            body(Settings(defaults: defaults), defaults)
-        }
-        else {
-            Issue.record("Could not create a defaults suite")
-        }
+    private func withSettings(_ body: (Settings, UserDefaults) -> Void) throws -> Void {
+        let defaults = try TemporaryUserDefaults.make()
+        body(Settings(defaults: defaults), defaults)
     }
 
-    @Test func defaultsMatchTheDesign() -> Void {
-        self.withSettings { settings, _ in
+    @Test func defaultsMatchTheDesign() throws -> Void {
+        try self.withSettings { settings, _ in
             #expect(settings.detentsPerRevolution == 36)
             #expect(settings.volumeStepPercent == 2)
             #expect(settings.reverseDirection == false)
@@ -29,8 +23,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func valuesRoundTrip() -> Void {
-        self.withSettings { settings, _ in
+    @Test func valuesRoundTrip() throws -> Void {
+        try self.withSettings { settings, _ in
             settings.detentsPerRevolution = 72
             settings.volumeStepPercent = 5
             settings.reverseDirection = true
@@ -47,8 +41,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func outOfRangeStoredValuesFallBackToDefaults() -> Void {
-        self.withSettings { settings, defaults in
+    @Test func outOfRangeStoredValuesFallBackToDefaults() throws -> Void {
+        try self.withSettings { settings, defaults in
             defaults.set(50, forKey: "detentsPerRevolution")
             defaults.set(4, forKey: "volumeStepPercent")
             #expect(settings.detentsPerRevolution == 36)
@@ -56,8 +50,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func everyDeviceIsEnabledUntilExcluded() -> Void {
-        self.withSettings { settings, _ in
+    @Test func everyDeviceIsEnabledUntilExcluded() throws -> Void {
+        try self.withSettings { settings, _ in
             #expect(settings.excludedDeviceUIDs.isEmpty == true)
             #expect(settings.isDeviceEnabled("speakers") == true)
             settings.setDevice("speakers", enabled: false)
@@ -69,8 +63,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func settingADeviceToItsCurrentStateDoesNotWrite() -> Void {
-        self.withSettings { settings, _ in
+    @Test func settingADeviceToItsCurrentStateDoesNotWrite() throws -> Void {
+        try self.withSettings { settings, _ in
             var changes = 0
             settings.onChange = { changes += 1 }
             settings.setDevice("speakers", enabled: true)
@@ -78,8 +72,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func rememberDevicesMergesWithoutOnChange() -> Void {
-        self.withSettings { settings, _ in
+    @Test func rememberDevicesMergesWithoutOnChange() throws -> Void {
+        try self.withSettings { settings, _ in
             var changes = 0
             settings.onChange = { changes += 1 }
             settings.rememberDevices(["speakers": "MacBook Pro Speakers"])
@@ -93,8 +87,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func softwareVolumeIsOptInAndRespectsExclusion() -> Void {
-        self.withSettings { settings, _ in
+    @Test func softwareVolumeIsOptInAndRespectsExclusion() throws -> Void {
+        try self.withSettings { settings, _ in
             #expect(settings.wantsSoftwareVolume("m2") == false)
             settings.setSoftwareVolume("m2", enabled: true)
             #expect(settings.softwareVolumeDeviceUIDs == ["m2"])
@@ -106,8 +100,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func softwareVolumeLevelStartsFullAndIsStoredWithoutOnChange() -> Void {
-        self.withSettings { settings, _ in
+    @Test func softwareVolumeLevelStartsFullAndIsStoredWithoutOnChange() throws -> Void {
+        try self.withSettings { settings, _ in
             var changes = 0
             settings.onChange = { changes += 1 }
             #expect(settings.softwareVolumeLevel("m2") == 1)
@@ -118,8 +112,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func iconStyleDefaultsToArcAndFallsBack() -> Void {
-        self.withSettings { settings, defaults in
+    @Test func iconStyleDefaultsToArcAndFallsBack() throws -> Void {
+        try self.withSettings { settings, defaults in
             #expect(settings.iconStyle == .arc)
             settings.iconStyle = .dots
             #expect(settings.iconStyle == .dots)
@@ -128,8 +122,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func everyWriteCallsOnChange() -> Void {
-        self.withSettings { settings, _ in
+    @Test func everyWriteCallsOnChange() throws -> Void {
+        try self.withSettings { settings, _ in
             var changes = 0
             settings.onChange = { changes += 1 }
             settings.detentsPerRevolution = 18
@@ -138,8 +132,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func keptInputIsOffByDefaultAndRoundTrips() -> Void {
-        self.withSettings { settings, defaults in
+    @Test func keptInputIsOffByDefaultAndRoundTrips() throws -> Void {
+        try self.withSettings { settings, defaults in
             var changes = 0
             settings.onChange = { changes += 1 }
             #expect(settings.keptInputDeviceUID == nil)
@@ -154,8 +148,8 @@ struct SettingsTests {
         }
     }
 
-    @Test func rememberInputDevicesIsSeparateFromOutputs() -> Void {
-        self.withSettings { settings, _ in
+    @Test func rememberInputDevicesIsSeparateFromOutputs() throws -> Void {
+        try self.withSettings { settings, _ in
             var changes = 0
             settings.onChange = { changes += 1 }
             settings.rememberInputDevices(["m2": "M2"])

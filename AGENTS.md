@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-10-22
+**Last updated:** 2026-11-09
 
 <!-- {preamble} -->
 
@@ -107,6 +107,7 @@ Architecture and behavior changes go into `Docs/DESIGN.md` as well.
 
 - Unit tests: target `FeelTheNoizeTests` in `Tests/FeelTheNoizeTests`, hosted in the app; the app does not install `AppDelegate` while hosting tests, so a test run never seizes the Dial or touches the audio device
 - Test layout mirrors `Sources/FeelTheNoize`: a suite for `Sources/FeelTheNoize/<Group>/Foo.swift` lives in `Tests/FeelTheNoizeTests/<Group>/FooTests.swift`; shared fakes and fixtures in `Tests/FeelTheNoizeTests/Fixtures/`
+- `UserDefaults` in tests: always `TemporaryUserDefaults.make()` (Fixtures), never a plainly named suite or `.standard`; a plain suite name leaves a plist in `~/Library/Preferences` that cannot be removed
 - Hardware checks: the manual test checklist in `Docs/DESIGN.md` §11.2
 - Open review findings and the fix plan: `Docs/CODE_REVIEW.md`; its Decisions table settles the questions the plan raised, so execute it without re-asking
 - Testing framework: Swift Testing

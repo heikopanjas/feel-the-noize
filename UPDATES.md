@@ -4,6 +4,12 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-11-09 (v1.2.20, test defaults out of ~/Library/Preferences)
+
+- `SettingsTests` takes its defaults from the new fixture `TemporaryUserDefaults`, which names each suite by an absolute path in one temporary directory (`FeelTheNoizeTests.UserDefaults`) that the first use in a test run clears and recreates. The `com.panjas.FeelTheNoizeTests.<UUID>` suites and their `removePersistentDomain` cleanup are gone; a suite that cannot be created now throws through `#require` instead of recording an issue. Reason: every test run left one plist per suite in `~/Library/Preferences`, since `removePersistentDomain` leaves an empty plist and `cfprefsd` writes a deleted one back; 342 had piled up.
+- AGENTS.md Testing names `TemporaryUserDefaults` as the only way to get `UserDefaults` in tests.
+- version bump: 1.2.19 to 1.2.20 (PATCH - tests only)
+
 ### 2026-10-22 (v1.2.19, review: icon script verified)
 
 - `./build.sh icon` on a Mac exits 0 and rewrites all ten AppIcon PNGs byte-identical, so the error handling of milestone 3.8 left the drawing unchanged. `Docs/CODE_REVIEW.md` status step 3 marked done; only the manual hardware checklist remains. Reason: `Docs/CODE_REVIEW.md` status, step 3.
