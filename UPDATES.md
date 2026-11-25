@@ -4,6 +4,10 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-11-25 (v1.2.20, review: haptics checklist passed)
+
+- manual checklist items 2 to 5 of DESIGN.md §11.2 (detent clicks and steps, mute and unmute clicks, press and turn, end-stop buzz) passed on 1.2.20, checked by the developer. The haptics now run through `DelayedAction`, so these were the review items that touched what the user feels. `Docs/CODE_REVIEW.md` status step 4 notes the result; 7, 21, 9, 18 and 14 to 17 remain. Reason: `Docs/CODE_REVIEW.md` status, step 4.
+
 ### 2026-11-09 (v1.2.20, test defaults out of ~/Library/Preferences)
 
 - `SettingsTests` takes its defaults from the new fixture `TemporaryUserDefaults`, which names each suite by an absolute path in one temporary directory (`FeelTheNoizeTests.UserDefaults`) that the first use in a test run clears and recreates. The `com.panjas.FeelTheNoizeTests.<UUID>` suites and their `removePersistentDomain` cleanup are gone; a suite that cannot be created now throws through `#require` instead of recording an issue. Reason: every test run left one plist per suite in `~/Library/Preferences`, since `removePersistentDomain` leaves an empty plist and `cfprefsd` writes a deleted one back; 342 had piled up.

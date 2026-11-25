@@ -798,10 +798,10 @@ Timer code takes its sleep as an injected `(Duration) async -> Void` (`DialKeepA
 ### 11.2 Manual Test Checklist
 
 1. Fresh install: app starts, icon appears, Dial connects without prompts (or with one Input Monitoring prompt, per §9.2).
-2. Turn slowly and fast in both directions; each detent clicks and changes volume by exactly one step.
-3. Short press mutes (double click felt), press again unmutes (single click).
-4. Press and turn: fine steps, no mute toggle on release.
-5. Turn past 100 % and 0 %: end-stop buzz, no repeated buzzing while spinning.
+2. Turn slowly and fast in both directions; each detent clicks and changes volume by exactly one step. Passed 2026-11-25 on 1.2.20, checked by the developer after the review.
+3. Short press mutes (double click felt), press again unmutes (single click). Passed 2026-11-25 on 1.2.20, checked by the developer after the review.
+4. Press and turn: fine steps, no mute toggle on release. Passed 2026-11-25 on 1.2.20, checked by the developer after the review.
+5. Turn past 100 % and 0 %: end-stop buzz, no repeated buzzing while spinning. Passed 2026-11-25 on 1.2.20, checked by the developer after the review.
 6. Change volume and mute with the keyboard: icon and menu follow.
 7. Connect AirPods, then disconnect: control follows the default output.
 8. Select an HDMI output without volume control: disabled state.
